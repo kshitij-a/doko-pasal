@@ -8,7 +8,7 @@ const STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'cancel
 
 export default function AdminOrders() {
   const router = useRouter()
-  const [orders, setOrders] = useState([])
+  const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [updating, setUpdating] = useState(null)
