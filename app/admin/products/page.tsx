@@ -10,7 +10,7 @@ const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', '2-3Y', '4-5Y'
 export default function AdminProducts() {
   const router = useRouter()
   const fileInputRef = useRef(null)
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)

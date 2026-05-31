@@ -127,7 +127,7 @@ function ProductCard({ product, onAddToCart }) {
 }
 
 export default function Products() {
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('All')
   const [user, setUser] = useState(null)
