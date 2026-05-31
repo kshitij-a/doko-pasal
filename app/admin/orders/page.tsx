@@ -11,10 +11,9 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
-  const [updating, setUpdating] = useState(null)
+  const [updating, setUpdating] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [cancelNote, setCancelNote] = useState('')
-  const [cancellingId, setCancellingId] = useState(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   useEffect(() => { checkAdmin() }, [])
 
@@ -35,40 +34,38 @@ export default function AdminOrders() {
     setLoading(false)
   }
 
-  const updateStatus = async (orderId, newStatus) => {
+  const updateStatus = async (orderId: string, newStatus: string) => {
     setUpdating(orderId)
     await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId)
-    setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o))
+    setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: newStatus } : o))
     setUpdating(null)
   }
 
-  const updatePayment = async (orderId, newStatus) => {
+  const updatePayment = async (orderId: string, newStatus: string) => {
     await supabase.from('orders').update({ payment_status: newStatus }).eq('id', orderId)
-    setOrders(orders.map(o => o.id === orderId ? { ...o, payment_status: newStatus } : o))
+    setOrders(orders.map((o: any) => o.id === orderId ? { ...o, payment_status: newStatus } : o))
   }
 
-  const cancelOrder = async (orderId) => {
-    if (!confirm(`Cancel this order? The customer will see their order as cancelled.`)) return
+  const cancelOrder = async (orderId: string) => {
+    if (!confirm('Cancel this order? The customer will see it as cancelled.')) return
     setCancellingId(orderId)
     await supabase.from('orders').update({
       order_status: 'cancelled',
       payment_status: 'cancelled',
-      cancel_note: cancelNote || 'Cancelled by admin'
     }).eq('id', orderId)
-    setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
+    setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
     setCancellingId(null)
-    setCancelNote('')
   }
 
-  const deleteOrder = async (orderId) => {
-    if (!confirm('Permanently DELETE this order? This cannot be undone.')) return
+  const deleteOrder = async (orderId: string) => {
+    if (!confirm('Permanently DELETE this order? Cannot be undone.')) return
     await supabase.from('order_items').delete().eq('order_id', orderId)
     await supabase.from('orders').delete().eq('id', orderId)
-    setOrders(orders.filter(o => o.id !== orderId))
+    setOrders(orders.filter((o: any) => o.id !== orderId))
   }
 
-  const statusBadge = (s) => {
-    const map = {
+  const statusBadge = (s: string) => {
+    const map: Record<string, string> = {
       pending: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
       processing: 'bg-blue-500/20 text-blue-300 border border-blue-500/40',
       shipped: 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
@@ -78,22 +75,22 @@ export default function AdminOrders() {
     return map[s] || 'bg-gray-500/20 text-gray-300'
   }
 
-  const paymentLabel = (m) => {
-    const map = { khalti: '💜 Khalti', esewa: '💚 eSewa', cod: '💵 COD', bank: '🏦 Bank' }
+  const paymentLabel = (m: string) => {
+    const map: Record<string, string> = { khalti: '💜 Khalti', esewa: '💚 eSewa', cod: '💵 COD', bank: '🏦 Bank' }
     return map[m] || m
   }
 
-  const counts = ['all', ...STATUS_OPTIONS].reduce((acc, s) => {
-    acc[s] = s === 'all' ? orders.length : orders.filter(o => o.order_status === s).length
+  const counts: Record<string, number> = ['all', ...STATUS_OPTIONS].reduce((acc: Record<string, number>, s) => {
+    acc[s] = s === 'all' ? orders.length : orders.filter((o: any) => o.order_status === s).length
     return acc
   }, {})
 
-  const filtered = orders.filter(o => {
+  const filtered = orders.filter((o: any) => {
     const matchesFilter = filter === 'all' || o.order_status === filter
-    const matchesSearch = !search || 
+    const matchesSearch = !search ||
       o.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
       o.customer_phone?.includes(search) ||
-      o.id.slice(0,8).toLowerCase().includes(search.toLowerCase())
+      o.id.slice(0, 8).toLowerCase().includes(search.toLowerCase())
     return matchesFilter && matchesSearch
   })
 
@@ -137,7 +134,6 @@ export default function AdminOrders() {
               <h1 className="text-3xl font-extrabold text-white">Orders</h1>
               <p className="text-gray-400 mt-1">{orders.length} total orders</p>
             </div>
-            {/* Search */}
             <input
               type="text"
               placeholder="Search by name, phone, ID..."
@@ -152,11 +148,9 @@ export default function AdminOrders() {
             {['all', ...STATUS_OPTIONS].map(s => (
               <button key={s} onClick={() => setFilter(s)}
                 className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition ${
-                  filter === s
-                    ? 'bg-white text-gray-900'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  filter === s ? 'bg-white text-gray-900' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
                 }`}>
-                {s} <span className="ml-1 opacity-70">({counts[s] || 0})</span>
+                {s} ({counts[s] || 0})
               </button>
             ))}
           </div>
@@ -171,7 +165,7 @@ export default function AdminOrders() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filtered.map(order => (
+              {filtered.map((order: any) => (
                 <div key={order.id} className={`bg-gray-900 border rounded-2xl overflow-hidden transition ${
                   order.order_status === 'cancelled' ? 'border-red-500/30 opacity-75' : 'border-gray-800'
                 }`}>
@@ -180,7 +174,7 @@ export default function AdminOrders() {
                     <div className="flex flex-wrap gap-6">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">ORDER ID</p>
-                        <p className="font-mono font-bold text-white text-sm">{order.id.slice(0,8).toUpperCase()}</p>
+                        <p className="font-mono font-bold text-white text-sm">{order.id.slice(0, 8).toUpperCase()}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-1">CUSTOMER</p>
@@ -210,7 +204,7 @@ export default function AdminOrders() {
 
                   {/* Items */}
                   <div className="px-6 py-3 border-b border-gray-800/50 bg-gray-800/20">
-                    {order.order_items?.map(item => (
+                    {order.order_items?.map((item: any) => (
                       <div key={item.id} className="flex justify-between text-sm py-1.5">
                         <span className="text-gray-300">
                           {item.product_name}
@@ -224,7 +218,6 @@ export default function AdminOrders() {
                   {/* Controls */}
                   <div className="px-6 py-4 flex flex-wrap gap-4 items-center justify-between">
                     <div className="flex flex-wrap gap-4 items-center">
-                      {/* Order Status */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Order:</span>
                         <select
@@ -239,7 +232,6 @@ export default function AdminOrders() {
                         {updating === order.id && <span className="text-xs text-gray-500 animate-pulse">Saving...</span>}
                       </div>
 
-                      {/* Payment Status */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Payment:</span>
                         <select
@@ -250,28 +242,27 @@ export default function AdminOrders() {
                           <option value="pending" className="bg-gray-800">⏳ Pending</option>
                           <option value="paid" className="bg-gray-800">✅ Paid</option>
                           <option value="failed" className="bg-gray-800">❌ Failed</option>
+                          <option value="cancelled" className="bg-gray-800">🚫 Cancelled</option>
                         </select>
                       </div>
 
-                      {/* Current Status Badge */}
                       <span className={`px-3 py-1.5 rounded-full text-xs font-bold capitalize ${statusBadge(order.order_status)}`}>
                         {order.order_status}
                       </span>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex gap-2">
                       {order.order_status !== 'cancelled' && order.order_status !== 'delivered' && (
                         <button
                           onClick={() => cancelOrder(order.id)}
                           disabled={cancellingId === order.id}
                           className="bg-red-600/20 text-red-300 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-600/40 transition disabled:opacity-50">
-                          🚫 Cancel Order
+                          🚫 Cancel
                         </button>
                       )}
                       <button
                         onClick={() => deleteOrder(order.id)}
-                        className="bg-gray-700/50 text-gray-400 border border-gray-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-900/40 hover:text-red-300 hover:border-red-500/30 transition">
+                        className="bg-gray-700/50 text-gray-400 border border-gray-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-900/40 hover:text-red-300 transition">
                         🗑️ Delete
                       </button>
                     </div>
