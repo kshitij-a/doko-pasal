@@ -12,7 +12,7 @@ export default function Home() {
         </div>
         <div className="flex gap-4 items-center">
           <Link href="/products" className="hover:text-yellow-300 font-medium">Shop</Link>
-          <Link href="/cart" className="hover:text-yellow-300 font-medium">🛒 Cart</Link>
+          <Link href="/wishlist" className="hover:text-yellow-300 font-medium">❤️ Wishlist</Link>
           <Link href="/auth/login" className="bg-white text-red-700 px-4 py-1 rounded-full font-bold hover:bg-yellow-300 hover:text-red-800 transition">Login</Link>
           <Link href="/auth/signup" className="bg-yellow-400 text-red-800 px-4 py-1 rounded-full font-bold hover:bg-yellow-300 transition">Sign Up</Link>
         </div>
