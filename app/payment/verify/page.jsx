@@ -49,7 +49,7 @@ function VerifyContent() {
         setStatus('failed')
         setMessage(result.message || 'Payment verification failed.')
       }
-    } catch (err: any) {
+    } catch (err) {
       setStatus('failed')
       setMessage('Error verifying payment: ' + err.message)
     }
