@@ -175,7 +175,7 @@ export async function POST(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Doko Pasal <orders@doko-pasal.vercel.app>',
+        from: 'Doko Pasal <onboarding@resend.dev>',
         to: [customerEmail],
         subject: `🎉 Order Confirmed #${orderId.slice(0,8).toUpperCase()} - Doko Pasal`,
         html: emailHtml,
