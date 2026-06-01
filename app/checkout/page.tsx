@@ -141,6 +141,25 @@ export default function Checkout() {
     if (paymentMethod === 'bank') {
       alert(`🏦 Bank Transfer Details:\n\nBank: Nepal Investment Bank\nAccount Name: Doko Pasal\nAccount No: 001234567890\n\nAfter transfer, WhatsApp screenshot to: 98XXXXXXXX\nMention Order ID: ${order.id.slice(0,8).toUpperCase()}`)
     }
+    // Send confirmation email
+try {
+  await fetch('/api/send-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      customerName: form.name,
+      customerEmail: user.email,
+      customerPhone: form.phone,
+      orderId: order.id,
+      items: items,
+      total: total,
+      paymentMethod: paymentMethod,
+      address: `${form.address}, ${form.city}`,
+    }),
+  })
+} catch (e) {
+  console.log('Email error:', e)
+}
     router.push('/orders?success=true')
     setLoading(false)
   }
