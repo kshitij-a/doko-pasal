@@ -36,31 +36,64 @@ export default function AdminOrders() {
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     setUpdating(orderId)
-    await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId)
-    setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: newStatus } : o))
+    const { data, error } = await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId).select()
+    if (error) {
+      alert('Failed to update order status: ' + error.message)
+      console.error('orders.update error', error)
+      setUpdating(null)
+      return
+    }
+    if (data && data.length > 0) {
+      setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: newStatus } : o))
+    }
     setUpdating(null)
   }
 
   const updatePayment = async (orderId: string, newStatus: string) => {
-    await supabase.from('orders').update({ payment_status: newStatus }).eq('id', orderId)
-    setOrders(orders.map((o: any) => o.id === orderId ? { ...o, payment_status: newStatus } : o))
+    const { data, error } = await supabase.from('orders').update({ payment_status: newStatus }).eq('id', orderId).select()
+    if (error) {
+      alert('Failed to update payment status: ' + error.message)
+      console.error('orders.update error', error)
+      return
+    }
+    if (data && data.length > 0) {
+      setOrders(orders.map((o: any) => o.id === orderId ? { ...o, payment_status: newStatus } : o))
+    }
   }
 
   const cancelOrder = async (orderId: string) => {
     if (!confirm('Cancel this order? The customer will see it as cancelled.')) return
     setCancellingId(orderId)
-    await supabase.from('orders').update({
+    const { data, error } = await supabase.from('orders').update({
       order_status: 'cancelled',
       payment_status: 'cancelled',
-    }).eq('id', orderId)
-    setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
+    }).eq('id', orderId).select()
+    if (error) {
+      alert('Failed to cancel order: ' + error.message)
+      setCancellingId(null)
+      console.error('orders.update cancel error', error)
+      return
+    }
+    if (data && data.length > 0) {
+      setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
+    }
     setCancellingId(null)
   }
 
   const deleteOrder = async (orderId: string) => {
     if (!confirm('Permanently DELETE this order? Cannot be undone.')) return
-    await supabase.from('order_items').delete().eq('order_id', orderId)
-    await supabase.from('orders').delete().eq('id', orderId)
+    const { error: itemError } = await supabase.from('order_items').delete().eq('order_id', orderId)
+    if (itemError) {
+      alert('Failed to delete order items: ' + itemError.message)
+      console.error('order_items.delete error', itemError)
+      return
+    }
+    const { error: orderError } = await supabase.from('orders').delete().eq('id', orderId).select()
+    if (orderError) {
+      alert('Failed to delete order: ' + orderError.message)
+      console.error('orders.delete error', orderError)
+      return
+    }
     setOrders(orders.filter((o: any) => o.id !== orderId))
   }
 
@@ -113,6 +146,7 @@ export default function AdminOrders() {
               { href: '/admin', label: 'Dashboard', icon: '📊' },
               { href: '/admin/products', label: 'Products', icon: '👔' },
               { href: '/admin/orders', label: 'All Orders', icon: '📦' },
+              { href: '/admin/messages', label: 'Messages', icon: '💬' },
             ].map(item => (
               <Link key={item.href} href={item.href}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-gray-800 hover:text-white transition font-medium">

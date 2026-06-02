@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -35,7 +35,7 @@ export default function ChatWidget() {
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new])
+        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
         if (!open && payload.new.is_admin) {
           setUnread(u => u + 1)
         }
@@ -95,7 +95,9 @@ export default function ChatWidget() {
     if (!content.trim() && !mediaUrl) return
     setSending(true)
 
+    const messageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const msg = {
+      id: messageId,
       conversation_id: conversationId,
       sender_id: user.id,
       sender_name: user.user_metadata?.full_name || user.email?.split('@')[0],
@@ -106,8 +108,15 @@ export default function ChatWidget() {
       is_admin: false,
       is_read: false,
     }
-
-    await supabase.from('messages').insert(msg)
+    const { data: inserted, error: insertError } = await supabase.from('messages').insert(msg).select().single()
+    if (insertError) {
+      alert('Failed to send message: ' + insertError.message)
+      setSending(false)
+      return
+    }
+    if (inserted) {
+      setMessages(prev => prev.some(m => m.id === inserted.id) ? prev : [...prev, inserted])
+    }
     await supabase.from('conversations').update({
       last_message: content.trim() || (mediaType === 'image' ? '📷 Photo' : '🎥 Video'),
       last_message_at: new Date().toISOString(),
@@ -124,6 +133,7 @@ export default function ChatWidget() {
     const isVideo = file.type.startsWith('video/')
     if (!isImage && !isVideo) {
       alert('Only images and videos are allowed!')
+      setUploading(false)
       return
     }
     setUploading(true)

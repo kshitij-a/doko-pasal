@@ -9,6 +9,7 @@ export default function AdminMessages() {
   const [conversations, setConversations] = useState<any[]>([])
   const [selectedConv, setSelectedConv] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -60,6 +61,7 @@ export default function AdminMessages() {
   }
 
   const selectConversation = async (conv: any) => {
+    setSelectedConvId(conv.id)
     setSelectedConv(conv)
     const { data } = await supabase
       .from('messages')
@@ -70,6 +72,63 @@ export default function AdminMessages() {
     // Mark as read
     await supabase.from('conversations').update({ unread_count: 0 }).eq('id', conv.id)
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
+  }
+
+  const deleteMessage = async (messageId: string) => {
+    if (!messageId || !selectedConv) return
+    if (!confirm('Delete this message?')) return
+    const { error } = await supabase.from('messages').delete().eq('id', messageId)
+    if (error) {
+      alert('Failed to delete message: ' + error.message)
+      return
+    }
+    setMessages(prev => prev.filter(msg => msg.id !== messageId))
+  }
+  
+  const deleteConversation = async () => {
+    if (!selectedConv) return
+    if (!confirm('Delete this entire conversation? This cannot be undone.')) return
+    const { error: deleteMsgsError } = await supabase.from('messages').delete().eq('conversation_id', selectedConv.id)
+    if (deleteMsgsError) {
+      console.error('delete messages failed', deleteMsgsError)
+      alert('Failed to delete messages: ' + deleteMsgsError.message)
+      return
+    }
+    const { error: deleteConvError } = await supabase.from('conversations').delete().eq('id', selectedConv.id)
+    if (deleteConvError) {
+      console.error('delete conversation failed', deleteConvError)
+      alert('Failed to delete conversation: ' + deleteConvError.message)
+      return
+    }
+    setConversations(prev => prev.filter(conv => conv.id !== selectedConv.id))
+    setSelectedConv(null)
+    setMessages([])
+  }
+
+  const parseTimestamp = (value: string | null | undefined) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (!isNaN(date.getTime())) return date
+    const fixed = new Date(value.replace(' ', 'T'))
+    return isNaN(fixed.getTime()) ? null : fixed
+  }
+
+  const timeAgo = (date: string | null | undefined) => {
+    const dt = parseTimestamp(date)
+    if (!dt) return ''
+    const diff = Date.now() - dt.getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return dt.toLocaleDateString('en-NP', { month: 'short', day: 'numeric' })
+  }
+
+  const formatMessageTime = (date: string | null | undefined) => {
+    const dt = parseTimestamp(date)
+    if (!dt) return ''
+    return dt.toLocaleTimeString('en-NP', { hour: '2-digit', minute: '2-digit' })
   }
 
   const sendReply = async (content: string, mediaUrl?: string, mediaType?: string) => {
@@ -114,15 +173,7 @@ export default function AdminMessages() {
     setUploading(false)
   }
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h ago`
-    return `${Math.floor(hrs / 24)}d ago`
-  }
+  
 
   return (
     <main className="min-h-screen bg-gray-950 text-white">
@@ -184,9 +235,9 @@ export default function AdminMessages() {
               ) : (
                 conversations.map(conv => (
                   <button key={conv.id} onClick={() => selectConversation(conv)}
-                    className={`w-full px-4 py-4 flex items-center gap-3 hover:bg-gray-800 transition text-left border-b border-gray-800/50 ${
-                      selectedConv?.id === conv.id ? 'bg-gray-800 border-l-2 border-l-red-500' : ''
-                    }`}>
+                      className={`w-full px-4 py-4 flex items-center gap-3 transition text-left border-b border-gray-800/50 ${
+                        selectedConv?.id === conv.id ? 'bg-gray-800 border-l-2 border-l-red-500' : conv.unread_count > 0 ? 'bg-slate-900' : 'hover:bg-gray-800'
+                      }`}>
                     {/* Avatar */}
                     <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-xl font-extrabold text-white flex-shrink-0">
                       {conv.user_name?.charAt(0)?.toUpperCase() || '?'}
@@ -200,7 +251,7 @@ export default function AdminMessages() {
                       <p className="text-gray-600 text-xs truncate">{conv.user_email}</p>
                     </div>
                     {conv.unread_count > 0 && (
-                      <span className="bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold flex-shrink-0">
+                      <span className="bg-red-600 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold flex-shrink-0">
                         {conv.unread_count}
                       </span>
                     )}
@@ -231,6 +282,10 @@ export default function AdminMessages() {
                     <p className="font-extrabold text-white">{selectedConv.user_name}</p>
                     <p className="text-gray-400 text-xs">{selectedConv.user_email}</p>
                   </div>
+                  <button onClick={deleteConversation}
+                    className="ml-auto bg-red-600 hover:bg-red-500 px-3 py-2 rounded-xl text-white text-sm transition">
+                    Delete Chat
+                  </button>
                 </div>
 
                 {/* Messages */}
@@ -248,7 +303,7 @@ export default function AdminMessages() {
                         </div>
                       )}
                       <div className={`max-w-sm ${msg.is_admin ? 'items-end' : 'items-start'} flex flex-col`}>
-                        <div className={`rounded-2xl px-4 py-3 ${
+                        <div className={`relative rounded-2xl px-4 py-3 ${
                           msg.is_admin
                             ? 'bg-red-700 text-white rounded-tr-sm'
                             : 'bg-gray-800 text-gray-100 rounded-tl-sm'
@@ -265,7 +320,7 @@ export default function AdminMessages() {
                           {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
                         </div>
                         <p className="text-gray-600 text-xs mt-1 px-1">
-                          {new Date(msg.created_at).toLocaleTimeString('en-NP', { hour: '2-digit', minute: '2-digit' })}
+                          {formatMessageTime(msg.created_at)}
                           {msg.is_admin && ' · You'}
                         </p>
                       </div>

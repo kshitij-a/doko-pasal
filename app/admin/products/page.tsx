@@ -179,6 +179,7 @@ export default function AdminProducts() {
               { href: '/admin', label: 'Dashboard', icon: '📊' },
               { href: '/admin/products', label: 'Products', icon: '👔' },
               { href: '/admin/orders', label: 'All Orders', icon: '📦' },
+              { href: '/admin/messages', label: 'Messages', icon: '💬' },
             ].map(item => (
               <Link key={item.href} href={item.href}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-gray-800 hover:text-white transition font-medium">

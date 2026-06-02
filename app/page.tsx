@@ -1,8 +1,18 @@
 'use client'
 import Link from 'next/link'
-import ChatWidget from '../components/ChatWidget'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (data.user) setUser(data.user)
+    }
+    loadUser()
+  }, [])
   return (
     <main className="min-h-screen bg-white">
 
@@ -15,8 +25,14 @@ export default function Home() {
           <Link href="/products" className="hover:text-yellow-300 font-medium">Shop</Link>
           <Link href="/wishlist" className="hover:text-yellow-300 font-medium">❤️ Wishlist</Link>
           <Link href="/cart" className="hover:text-yellow-300 font-medium">🛒 Cart</Link>
-          <Link href="/auth/login" className="bg-white text-red-700 px-4 py-1 rounded-full font-bold hover:bg-yellow-300 hover:text-red-800 transition">Login</Link>
-          <Link href="/auth/signup" className="bg-yellow-400 text-red-800 px-4 py-1 rounded-full font-bold hover:bg-yellow-300 transition">Sign Up</Link>
+          {user ? (
+            <Link href="/profile" className="hover:text-yellow-300 font-medium">Profile</Link>
+          ) : (
+            <>
+              <Link href="/auth/login" className="bg-white text-red-700 px-4 py-1 rounded-full font-bold hover:bg-yellow-300 hover:text-red-800 transition">Login</Link>
+              <Link href="/auth/signup" className="bg-yellow-400 text-red-800 px-4 py-1 rounded-full font-bold hover:bg-yellow-300 transition">Sign Up</Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -75,8 +91,6 @@ export default function Home() {
         <p className="text-red-300 text-sm mt-2">© 2026 Doko Pasal. All rights reserved.</p>
       </footer>
 
-      {/* CHAT WIDGET */}
-      <ChatWidget />
     </main>
   )
 }
