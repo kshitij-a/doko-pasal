@@ -3,6 +3,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Navbar from '../../../components/Navbar'
+import CartDrawer from '../../../components/CartDrawer'
+import MobileBottomBar from '../../../components/MobileBottomBar'
+import { logActivity } from '../../../lib/activity'
 
 export default function ProductDetail() {
   const router = useRouter()
@@ -21,12 +25,14 @@ export default function ProductDetail() {
   const [reviews, setReviews] = useState<any[]>([])
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' })
   const [submittingReview, setSubmittingReview] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
     // Get product ID from the URL
     const id = window.location.pathname.split('/').pop()
     if (id) {
       loadProduct(id)
+      logActivity('product_view', { product_id: id }, `/products/${id}`)
     }
     checkUser()
     const saved = localStorage.getItem('cart')
@@ -144,6 +150,7 @@ export default function ProductDetail() {
     : product?.image_url ? [product.image_url] : []
 
   const cartCount = cart.reduce((a: number, i: any) => a + i.qty, 0)
+  const cartTotal = cart.reduce((sum: number, i: any) => sum + i.price * i.qty, 0)
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
@@ -167,7 +174,7 @@ export default function ProductDetail() {
   )
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white pb-16 sm:pb-0">
       {/* TOAST */}
       {toast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
@@ -175,26 +182,7 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* NAVBAR */}
-      <nav className="bg-red-700 text-white px-6 py-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
-        <Link href="/" className="text-2xl font-extrabold">🧺 Doko Pasal</Link>
-        <div className="flex gap-3 items-center">
-          <Link href="/products" className="hover:text-yellow-300 font-medium hidden sm:block">← Shop</Link>
-          <Link href="/cart" className="relative hover:text-yellow-300 font-medium text-lg">
-            🛒 Cart
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-3 bg-yellow-400 text-red-800 text-xs rounded-full w-5 h-5 flex items-center justify-center font-extrabold">
-                {cartCount}
-              </span>
-            )}
-          </Link>
-          {user ? (
-            <Link href="/orders" className="bg-yellow-400 text-red-800 px-4 py-1.5 rounded-full font-extrabold text-sm">My Orders</Link>
-          ) : (
-            <Link href="/auth/login" className="bg-white text-red-700 px-4 py-1.5 rounded-full font-extrabold text-sm">Login</Link>
-          )}
-        </div>
-      </nav>
+      <Navbar onCartOpen={() => setCartOpen(true)} cartCount={cartCount} wishlistCount={wishlist.length} />
 
       {/* BREADCRUMB */}
       <div className="max-w-6xl mx-auto px-4 py-3 text-sm text-gray-500 flex gap-2 items-center flex-wrap">
@@ -508,7 +496,26 @@ export default function ProductDetail() {
         </div>
       )}
 
-      <footer className="bg-red-700 text-white py-10 text-center mt-16">
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cart={cart}
+        cartTotal={cartTotal}
+        onRemove={(key: string) => {
+          const newCart = cart.filter((i: any) => `${i.id}-${i.selectedSize}` !== key)
+          setCart(newCart)
+          localStorage.setItem('cart', JSON.stringify(newCart))
+        }}
+        onUpdateQty={(key: string, qty: number) => {
+          const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty } : i)
+          setCart(newCart)
+          localStorage.setItem('cart', JSON.stringify(newCart))
+        }}
+      />
+
+      <MobileBottomBar cartCount={cartCount} cartTotal={cartTotal} onCartOpen={() => setCartOpen(true)} />
+
+      <footer className="bg-red-700 text-white py-10 text-center mt-16 hidden sm:block">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>
         <p className="text-red-200 text-sm mt-1">Made with ❤️ in Nepal</p>
       </footer>

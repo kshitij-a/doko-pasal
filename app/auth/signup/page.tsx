@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { logActivity } from '../../../lib/activity'
 
 export default function SignUp() {
   const router = useRouter()
@@ -31,6 +32,7 @@ export default function SignUp() {
       setError(error.message)
     } else {
       setMessage('✅ Account created! Please check your email to confirm, then login.')
+      logActivity('signup', { email }, '/auth/signup')
     }
     setLoading(false)
   }

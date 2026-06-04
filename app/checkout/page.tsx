@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { logActivity } from '../../lib/activity'
 
 export default function Checkout() {
   const router = useRouter()
@@ -161,6 +162,8 @@ try {
   console.log('Email error:', e)
 }
     router.push('/orders?success=true')
+    logActivity('purchase', { total, payment_method: paymentMethod, items: cart.length }, '/checkout')
+    logActivity('checkout', { total, payment_method: paymentMethod }, '/checkout')
     setLoading(false)
   }
 

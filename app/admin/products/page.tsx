@@ -161,41 +161,8 @@ export default function AdminProducts() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
-      <div className="flex">
-        {/* SIDEBAR */}
-        <aside className="w-64 min-h-screen bg-gray-900 border-r border-gray-800 fixed left-0 top-0 flex flex-col z-50">
-          <div className="p-6 border-b border-gray-800">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-xl">🧺</div>
-              <div>
-                <p className="font-bold text-white">Doko Pasal</p>
-                <p className="text-xs text-red-400 font-semibold tracking-widest">ADMIN</p>
-              </div>
-            </div>
-          </div>
-          <nav className="p-4 flex-1 space-y-1">
-            {[
-              { href: '/admin', label: 'Dashboard', icon: '📊' },
-              { href: '/admin/products', label: 'Products', icon: '👔' },
-              { href: '/admin/orders', label: 'All Orders', icon: '📦' },
-              { href: '/admin/messages', label: 'Messages', icon: '💬' },
-            ].map(item => (
-              <Link key={item.href} href={item.href}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-gray-800 hover:text-white transition font-medium">
-                <span>{item.icon}</span>{item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="p-4 border-t border-gray-800">
-            <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800 text-sm transition">
-              🏪 View Store
-            </Link>
-          </div>
-        </aside>
-
-        {/* MAIN */}
-        <div className="ml-64 flex-1 p-8">
+    <main className="text-white">
+      <div className="p-8">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-extrabold text-white">Products</h1>
@@ -398,7 +365,6 @@ export default function AdminProducts() {
             )}
           </div>
         </div>
-      </div>
     </main>
   )
 }

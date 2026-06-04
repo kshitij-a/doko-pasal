@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { logActivity } from '../../../lib/activity'
 
 export default function Login() {
   const router = useRouter()
@@ -23,6 +24,7 @@ export default function Login() {
     if (error) {
       setError(error.message)
     } else {
+      logActivity('login', { email }, '/auth/login')
       router.push('/')
     }
     setLoading(false)

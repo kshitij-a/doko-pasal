@@ -2,10 +2,17 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import Link from 'next/link'
+import Navbar from '../../components/Navbar'
+import CartDrawer from '../../components/CartDrawer'
+import MobileBottomBar from '../../components/MobileBottomBar'
+import { logActivity } from '../../lib/activity'
 
-function ProductCard({ product, onAddToCart }: { product: any, onAddToCart: any }) {
+function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQuickAdd }: {
+  product: any, onAddToCart: any, onToggleWishlist: any, inWishlist: boolean, onQuickAdd: (p: any, size: string) => void
+}) {
   const [currentImg, setCurrentImg] = useState(0)
-  const [selectedSize, setSelectedSize] = useState('')
+  const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || '')
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
   const images = product.image_urls?.length > 0
     ? product.image_urls
     : product.image_url ? [product.image_url] : []
@@ -14,7 +21,7 @@ function ProductCard({ product, onAddToCart }: { product: any, onAddToCart: any 
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group">
       {/* IMAGE SLIDER */}
       <Link href={`/products/${product.id}`}>
-        <div className="relative bg-gray-100 h-64 overflow-hidden cursor-pointer">
+        <div className="relative bg-gray-100 aspect-[3/4] overflow-hidden cursor-pointer">
           {images.length > 0 ? (
             <>
               <img src={images[currentImg]} alt={product.name}
@@ -22,65 +29,67 @@ function ProductCard({ product, onAddToCart }: { product: any, onAddToCart: any 
               {images.length > 1 && (
                 <>
                   <button onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i - 1 + images.length) % images.length) }}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white w-9 h-9 rounded-full text-xl font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">‹</button>
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white w-8 h-8 rounded-full text-lg font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">‹</button>
                   <button onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i + 1) % images.length) }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white w-9 h-9 rounded-full text-xl font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">›</button>
-                  <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white w-8 h-8 rounded-full text-lg font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">›</button>
+                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                     {images.map((_: any, i: number) => (
                       <button key={i} onClick={(e) => { e.preventDefault(); setCurrentImg(i) }}
-                        className={`w-2 h-2 rounded-full transition-all ${i === currentImg ? 'bg-white scale-125' : 'bg-white/50'}`} />
+                        className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentImg ? 'bg-white scale-125' : 'bg-white/50'}`} />
                     ))}
                   </div>
-                  <span className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
-                    {currentImg + 1}/{images.length}
-                  </span>
                 </>
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-7xl opacity-30">
+            <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">
               {product.category === "Men's Wear" ? '👔' : product.category === "Women's Wear" ? '👗' : '🧒'}
             </div>
           )}
-          <span className="absolute top-3 left-3 bg-red-700 text-white text-xs px-3 py-1 rounded-full font-bold shadow">
+          {/* Badges */}
+          <span className="absolute top-2 left-2 bg-red-700 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow">
             {product.category}
           </span>
           {product.stock === 0 && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-lg">Sold Out</span>
+              <span className="bg-red-600 text-white px-3 py-1.5 rounded-full font-bold text-sm">Sold Out</span>
             </div>
           )}
           {product.stock > 0 && product.stock < 5 && (
-            <span className="absolute bottom-3 right-3 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+            <span className="absolute bottom-2 right-2 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
               Only {product.stock} left!
             </span>
           )}
           {/* View detail hint */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
-            <span className="bg-white text-gray-800 px-4 py-2 rounded-full font-bold text-sm opacity-0 group-hover:opacity-100 transition shadow-lg">
+            <span className="bg-white text-gray-800 px-3 py-1.5 rounded-full font-bold text-xs opacity-0 group-hover:opacity-100 transition shadow-lg">
               View Details →
             </span>
           </div>
+          {/* Wishlist button */}
+          <button
+            onClick={(e) => { e.preventDefault(); onToggleWishlist(product.id) }}
+            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition ${inWishlist ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:scale-110'}`}
+            title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            {inWishlist ? '❤️' : '🤍'}
+          </button>
         </div>
       </Link>
 
       {/* PRODUCT INFO */}
-      <div className="p-5 flex flex-col flex-1">
+      <div className="p-3 sm:p-4 flex flex-col flex-1">
         <Link href={`/products/${product.id}`}>
-          <h3 className="text-lg font-extrabold text-gray-900 mb-1 hover:text-red-600 transition cursor-pointer">{product.name}</h3>
+          <h3 className="text-sm sm:text-base font-extrabold text-gray-900 mb-1 hover:text-red-600 transition cursor-pointer line-clamp-1">{product.name}</h3>
         </Link>
-        {product.description && (
-          <p className="text-gray-500 text-sm mb-3 line-clamp-2">{product.description}</p>
-        )}
 
-        {/* SIZE SELECTOR */}
+        {/* SIZE SWATCHES */}
         {product.sizes && product.sizes.length > 0 && (
-          <div className="mb-4">
-            <p className="text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Select Size:</p>
-            <div className="flex gap-1.5 flex-wrap">
+          <div className="mb-2 sm:mb-3">
+            <div className="flex gap-1 flex-wrap">
               {product.sizes.map((size: string) => (
                 <button key={size} onClick={() => setSelectedSize(size)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold border-2 transition ${
+                  className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-bold border transition ${
                     selectedSize === size
                       ? 'bg-red-700 text-white border-red-700'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-red-400 hover:text-red-600'
@@ -93,25 +102,15 @@ function ProductCard({ product, onAddToCart }: { product: any, onAddToCart: any 
         )}
 
         {/* PRICE + BUTTONS */}
-        <div className="mt-auto pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-2xl font-extrabold text-red-700">Rs. {product.price?.toLocaleString()}</span>
-            <Link href={`/products/${product.id}`}
-              className="text-xs text-gray-500 hover:text-red-600 font-semibold underline">
-              View Details
-            </Link>
+        <div className="mt-auto pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-lg sm:text-xl font-extrabold text-red-700">Rs. {product.price?.toLocaleString()}</span>
           </div>
           <button
-            onClick={() => {
-              if (product.sizes?.length > 0 && !selectedSize) {
-                alert('Please select a size first!')
-                return
-              }
-              onAddToCart({ ...product, selectedSize })
-            }}
+            onClick={() => onQuickAdd(product, selectedSize)}
             disabled={product.stock === 0}
-            className="w-full bg-red-700 text-white py-2.5 rounded-xl font-bold hover:bg-red-600 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow">
-            {product.stock === 0 ? 'Sold Out' : '🛒 Add to Cart'}
+            className="w-full bg-red-700 text-white py-2 rounded-xl font-bold hover:bg-red-600 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm shadow">
+            {product.stock === 0 ? 'Sold Out' : '🛒 Quick Add'}
           </button>
         </div>
       </div>
@@ -125,15 +124,20 @@ export default function Products() {
   const [category, setCategory] = useState('All')
   const [user, setUser] = useState<any>(null)
   const [cart, setCart] = useState<any[]>([])
+  const [wishlist, setWishlist] = useState<string[]>([])
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('newest')
+  const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
     fetchProducts()
     checkUser()
     const saved = localStorage.getItem('cart')
     if (saved) setCart(JSON.parse(saved))
+    const savedWishlist = localStorage.getItem('wishlist')
+    if (savedWishlist) setWishlist(JSON.parse(savedWishlist))
+    logActivity('page_view', { page: 'products' }, '/products')
   }, [])
 
   const checkUser = async () => {
@@ -147,26 +151,54 @@ export default function Products() {
     setLoading(false)
   }
 
-  const addToCart = (product: any) => {
-    const key = `${product.id}-${product.selectedSize}`
+  const addToCart = (product: any, size: string) => {
+    if (product.sizes?.length > 0 && !size) {
+      setToast('⚠️ Please select a size first!')
+      setTimeout(() => setToast(''), 2500)
+      return
+    }
+    const key = `${product.id}-${size}`
     const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
     let newCart
     if (existing) {
       newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: i.qty + 1 } : i)
     } else {
-      newCart = [...cart, { ...product, qty: 1 }]
+      newCart = [...cart, { ...product, qty: 1, selectedSize: size }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
     setToast(`✅ "${product.name}" added to cart!`)
+    logActivity('add_to_cart', { product_name: product.name, product_id: product.id, size, price: product.price }, '/products')
     setTimeout(() => setToast(''), 2500)
+  }
+
+  const toggleWishlist = (productId: string) => {
+    const isSaved = wishlist.includes(productId)
+    const updated = isSaved ? wishlist.filter(id => id !== productId) : [...wishlist, productId]
+    setWishlist(updated)
+    localStorage.setItem('wishlist', JSON.stringify(updated))
+    setToast(isSaved ? '💔 Removed from wishlist' : '❤️ Added to wishlist')
+    logActivity('wishlist', { product_id: productId, action: isSaved ? 'remove' : 'add' }, '/products')
+    setTimeout(() => setToast(''), 2000)
+  }
+
+  const removeCartItem = (key: string) => {
+    const newCart = cart.filter((i: any) => `${i.id}-${i.selectedSize}` !== key)
+    setCart(newCart)
+    localStorage.setItem('cart', JSON.stringify(newCart))
+  }
+
+  const updateQty = (key: string, qty: number) => {
+    const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty } : i)
+    setCart(newCart)
+    localStorage.setItem('cart', JSON.stringify(newCart))
   }
 
   const categories = ['All', "Men's Wear", "Women's Wear", "Kids' Wear"]
   let filtered = category === 'All' ? [...products] : products.filter((p: any) => p.category === category)
   if (search.trim()) {
     filtered = filtered.filter((p: any) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.name?.toLowerCase().includes(search.toLowerCase()) ||
       p.description?.toLowerCase().includes(search.toLowerCase())
     )
   }
@@ -174,96 +206,94 @@ export default function Products() {
   else if (sort === 'price-high') filtered.sort((a: any, b: any) => b.price - a.price)
 
   const cartCount = cart.reduce((a: number, i: any) => a + i.qty, 0)
+  const wishlistCount = wishlist.length
+  const cartTotal = cart.reduce((sum: number, i: any) => sum + i.price * i.qty, 0)
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 pb-28 sm:pb-0">
       {/* TOAST */}
       {toast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-5 py-2.5 rounded-2xl shadow-2xl font-semibold text-sm animate-fade-in">
           {toast}
         </div>
       )}
 
-      {/* NAVBAR */}
-      <nav className="bg-red-700 text-white px-6 py-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
-        <Link href="/" className="text-2xl font-extrabold tracking-wide">🧺 Doko Pasal</Link>
-        <div className="flex gap-3 items-center">
-          <Link href="/cart" className="relative hover:text-yellow-300 font-medium text-lg transition">
-            🛒 Cart
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-3 bg-yellow-400 text-red-800 text-xs rounded-full w-5 h-5 flex items-center justify-center font-extrabold shadow">
-                {cartCount}
-              </span>
-            )}
-          </Link>
-          {user ? (
-            <Link href="/orders" className="bg-yellow-400 text-red-800 px-4 py-1.5 rounded-full font-extrabold hover:bg-yellow-300 transition text-sm">My Orders</Link>
-          ) : (
-            <>
-              <Link href="/auth/login" className="bg-white text-red-700 px-4 py-1.5 rounded-full font-extrabold hover:bg-gray-100 transition text-sm">Login</Link>
-              <Link href="/auth/signup" className="bg-yellow-400 text-red-800 px-4 py-1.5 rounded-full font-extrabold hover:bg-yellow-300 transition text-sm">Sign Up</Link>
-            </>
-          )}
-        </div>
-      </nav>
+      <Navbar onCartOpen={() => setCartOpen(true)} cartCount={cartCount} wishlistCount={wishlistCount} />
 
       {/* HERO */}
-      <div className="bg-gradient-to-r from-red-800 via-red-700 to-red-600 text-white py-14 px-8 text-center">
-        <h1 className="text-5xl font-extrabold mb-3 drop-shadow">Our Collection</h1>
-        <p className="text-red-200 text-xl">Premium quality clothing — Made for Nepal 🇳🇵</p>
-        <p className="text-red-300 text-sm mt-2">{products.length} products available</p>
+      <div className="bg-gradient-to-r from-red-800 via-red-700 to-red-600 text-white py-10 sm:py-14 px-6 sm:px-8 text-center">
+        <h1 className="text-3xl sm:text-5xl font-extrabold mb-2 sm:mb-3 drop-shadow">Our Collection</h1>
+        <p className="text-red-200 text-base sm:text-xl">Premium quality clothing — Made for Nepal 🇳🇵</p>
+        <p className="text-red-300 text-xs sm:text-sm mt-2">{products.length} products available</p>
       </div>
 
-      {/* SEARCH + FILTER BAR */}
-      <div className="bg-white shadow-sm px-4 py-4">
-        <div className="max-w-6xl mx-auto flex flex-wrap gap-3 items-center justify-between">
-          <input type="text" placeholder="🔍 Search products..." value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 w-64" />
-          <div className="flex gap-2 flex-wrap">
+      {/* FILTER BAR */}
+      <div className="bg-white shadow-sm px-4 py-3 sm:py-4 sticky top-[52px] sm:top-[56px] z-40">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             {categories.map(cat => (
               <button key={cat} onClick={() => setCategory(cat)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold border-2 transition ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold border-2 transition whitespace-nowrap flex-shrink-0 ${
                   category === cat ? 'bg-red-700 text-white border-red-700' : 'bg-white text-gray-700 border-gray-200 hover:border-red-400'
                 }`}>
                 {cat}
               </button>
             ))}
+            <select value={sort} onChange={e => setSort(e.target.value)}
+              className="border border-gray-300 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white flex-shrink-0">
+              <option value="newest">Newest</option>
+              <option value="price-low">Price ↑</option>
+              <option value="price-high">Price ↓</option>
+            </select>
           </div>
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white">
-            <option value="newest">Newest First</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-          </select>
         </div>
       </div>
 
       {/* PRODUCTS GRID */}
-      <div className="max-w-6xl mx-auto px-4 py-10">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-10">
         {loading ? (
           <div className="text-center py-24">
-            <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500 text-lg">Loading products...</p>
+            <div className="w-14 h-14 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500 text-base sm:text-lg">Loading products...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-6xl mb-4">🧺</div>
-            <p className="text-gray-500 text-xl font-semibold">No products found</p>
+            <p className="text-gray-500 text-lg font-semibold">No products found</p>
+            <button onClick={() => { setCategory('All'); setSearch('') }}
+              className="mt-4 text-red-600 font-bold text-sm hover:underline">Clear filters</button>
           </div>
         ) : (
           <>
-            <p className="text-gray-500 text-sm mb-6">{filtered.length} product{filtered.length !== 1 ? 's' : ''} found</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6">{filtered.length} product{filtered.length !== 1 ? 's' : ''} found</p>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
               {filtered.map((product: any) => (
-                <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={addToCart}
+                  onToggleWishlist={toggleWishlist}
+                  inWishlist={wishlist.includes(product.id)}
+                  onQuickAdd={addToCart}
+                />
               ))}
             </div>
           </>
         )}
       </div>
 
-      <footer className="bg-red-700 text-white py-10 text-center mt-10">
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cart={cart}
+        cartTotal={cartTotal}
+        onRemove={removeCartItem}
+        onUpdateQty={updateQty}
+      />
+
+      <MobileBottomBar cartCount={cartCount} cartTotal={cartTotal} onCartOpen={() => setCartOpen(true)} />
+
+      <footer className="bg-red-700 text-white py-8 text-center mt-8 sm:mt-10 hidden sm:block">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>
         <p className="text-red-200 text-sm mt-1">Made with ❤️ in Nepal</p>
       </footer>
