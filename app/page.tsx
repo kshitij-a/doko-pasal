@@ -20,14 +20,20 @@ export default function Home() {
     logActivity('page_view', { page: 'home' }, '/')
 
     const loadBanners = async () => {
-      const { data } = await supabase.from('banners').select('*').eq('active', true).order('position', { ascending: true })
-      if (data && data.length > 0) setBanners(data)
+      try {
+        const { data, error } = await supabase.from('banners').select('*').eq('active', true).order('position', { ascending: true })
+        if (error) console.error('Error fetching banners:', error.message)
+        else if (data && data.length > 0) setBanners(data)
+      } catch (err) { console.error('Failed to fetch banners:', err) }
     }
     loadBanners()
 
     const loadProducts = async () => {
-      const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false }).limit(8)
-      if (data) setFeaturedProducts(data)
+      try {
+        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false }).limit(8)
+        if (error) console.error('Error fetching products:', error.message)
+        else if (data) setFeaturedProducts(data)
+      } catch (err) { console.error('Failed to fetch products:', err) }
     }
     loadProducts()
   }, [])

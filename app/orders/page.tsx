@@ -22,9 +22,12 @@ export default function Orders() {
   }
 
   const fetchOrders = async (userId) => {
-    const { data } = await supabase.from('orders').select('*, order_items(*)').eq('user_id', userId).order('created_at', { ascending: false })
-    if (data) setOrders(data)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from('orders').select('*, order_items(*)').eq('user_id', userId).order('created_at', { ascending: false })
+      if (error) console.error('Error fetching orders:', error.message)
+      else if (data) setOrders(data)
+    } catch (err) { console.error('Failed to fetch orders:', err) }
+    finally { setLoading(false) }
   }
 
   const statusBadge = (status) => {

@@ -27,17 +27,22 @@ export default function Wishlist() {
   }, [])
 
   const checkUser = async () => {
-    const { data } = await supabase.auth.getUser()
-    setUser(data.user)
+    try {
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+    } catch (err) { console.error('Auth check failed:', err) }
   }
 
   const fetchWishlistProducts = async (ids: string[]) => {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .in('id', ids)
-    if (data) setProducts(data)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', ids)
+      if (error) console.error('Error fetching wishlist:', error.message)
+      else if (data) setProducts(data)
+    } catch (err) { console.error('Failed to fetch wishlist:', err) }
+    finally { setLoading(false) }
   }
 
   const showToast = (msg: string) => {

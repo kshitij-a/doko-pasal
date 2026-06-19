@@ -43,41 +43,52 @@ export default function ProductDetail() {
   }, [])
 
   const checkUser = async () => {
-    const { data } = await supabase.auth.getUser()
-    setUser(data.user)
+    try {
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+    } catch (err) { console.error('Auth check failed:', err) }
   }
 
   const loadProduct = async (id: string) => {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', id)
-      .single()
-    if (data) {
-      setProduct(data)
-      loadRelated(data.category, data.id)
-      loadReviews(data.id)
-    }
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single()
+      if (error) console.error('Error loading product:', error.message)
+      else if (data) {
+        setProduct(data)
+        loadRelated(data.category, data.id)
+        loadReviews(data.id)
+      }
+    } catch (err) { console.error('Failed to load product:', err) }
+    finally { setLoading(false) }
   }
 
   const loadRelated = async (category: string, currentId: string) => {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('category', category)
-      .neq('id', currentId)
-      .limit(4)
-    if (data) setRelated(data)
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('category', category)
+        .neq('id', currentId)
+        .limit(4)
+      if (error) console.error('Error loading related:', error.message)
+      else if (data) setRelated(data)
+    } catch (err) { console.error('Failed to load related:', err) }
   }
 
   const loadReviews = async (productId: string) => {
-    const { data } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('product_id', productId)
-      .order('created_at', { ascending: false })
-    if (data) setReviews(data)
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false })
+      if (error) console.error('Error loading reviews:', error.message)
+      else if (data) setReviews(data)
+    } catch (err) { console.error('Failed to load reviews:', err) }
   }
 
   const showToast = (msg: string) => {

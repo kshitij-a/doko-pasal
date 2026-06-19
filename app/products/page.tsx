@@ -120,14 +120,25 @@ export default function Products() {
   }, [])
 
   const checkUser = async () => {
-    const { data } = await supabase.auth.getUser()
-    setUser(data.user)
+    try {
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+    } catch (err) { console.error('Auth check failed:', err) }
   }
 
   const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
-    if (data) setProducts(data)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+      if (error) {
+        console.error('Error fetching products:', error.message)
+      } else if (data) {
+        setProducts(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch products:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const addToCart = (product: any, size: string) => {
