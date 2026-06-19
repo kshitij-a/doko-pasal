@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { npFullDate } from '../../../lib/timezone'
 
 export default function AdminReviews() {
   const router = useRouter()
@@ -10,6 +11,7 @@ export default function AdminReviews() {
   const [toast, setToast] = useState('')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [products, setProducts] = useState<Record<string, any>>({})
 
   useEffect(() => { checkAdmin() }, [])
 
@@ -21,12 +23,9 @@ export default function AdminReviews() {
     fetchReviews()
   }
 
-  const [products, setProducts] = useState<Record<string, any>>({})
-
   const fetchReviews = async () => {
     const { data } = await supabase.from('reviews').select('*').order('created_at', { ascending: false })
     setReviews(data || [])
-
     const productIds = [...new Set((data || []).map(r => r.product_id).filter(Boolean))]
     if (productIds.length > 0) {
       const { data: productsData } = await supabase.from('products').select('id, name, price, image_url').in('id', productIds)
@@ -42,10 +41,7 @@ export default function AdminReviews() {
   const deleteReview = async (id: string) => {
     if (!confirm('Delete this review?')) return
     const { error } = await supabase.from('reviews').delete().eq('id', id)
-    if (!error) {
-      showToast('🗑️ Review deleted')
-      setReviews(reviews.filter(r => r.id !== id))
-    }
+    if (!error) { showToast('Review deleted'); setReviews(reviews.filter(r => r.id !== id)) }
   }
 
   const filtered = reviews.filter(r => {
@@ -62,89 +58,89 @@ export default function AdminReviews() {
     pct: reviews.length > 0 ? (reviews.filter(r => r.rating === star).length / reviews.length * 100) : 0
   }))
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading reviews...</div>
 
   return (
-    <div className="p-8 text-white">
-      {toast && <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm border border-gray-700">{toast}</div>}
+    <div>
+      {toast && <div className="admin-toast" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--admin-green)', border: '1px solid rgba(34,197,94,0.3)' }}>{toast}</div>}
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold">⭐ Review Moderation</h1>
-        <p className="text-gray-400 mt-1">{reviews.length} total reviews</p>
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Reviews</h1>
+          <p className="admin-page-subtitle">{reviews.length} reviews · {avgRating} avg rating</p>
+        </div>
       </div>
 
-      {/* RATING OVERVIEW */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8 flex items-center gap-8">
-        <div className="text-center">
-          <p className="text-5xl font-extrabold">{avgRating}</p>
-          <div className="flex justify-center mt-1">
-            {[1,2,3,4,5].map(s => <span key={s} className={`text-xl ${s <= Math.round(Number(avgRating)) ? 'text-yellow-400' : 'text-gray-600'}`}>★</span>)}
+      {/* Rating Overview */}
+      <div className="admin-card" style={{ padding: 20, marginBottom: 16, display: 'flex', gap: 32, alignItems: 'center' }}>
+        <div style={{ textAlign: 'center', minWidth: 80 }}>
+          <div style={{ font: '700 40px var(--admin-font-mono)', color: 'var(--admin-text)' }}>{avgRating}</div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 4 }}>
+            {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 16, color: s <= Math.round(Number(avgRating)) ? 'var(--admin-yellow)' : 'var(--admin-surface-3)' }}>★</span>)}
           </div>
-          <p className="text-gray-400 text-sm mt-1">{reviews.length} reviews</p>
+          <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', marginTop: 4 }}>{reviews.length} reviews</div>
         </div>
-        <div className="flex-1 space-y-2">
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {ratingCounts.map(r => (
-            <div key={r.star} className="flex items-center gap-3">
-              <span className="text-sm font-bold w-8">{r.star} ★</span>
-              <div className="flex-1 bg-gray-800 rounded-full h-2.5">
-                <div className="bg-yellow-500 h-2.5 rounded-full" style={{ width: `${r.pct}%` }} />
+            <div key={r.star} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ font: '500 12px var(--admin-font-mono)', color: 'var(--admin-text-soft)', width: 24, textAlign: 'right' }}>{r.star}★</span>
+              <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--admin-surface-2)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 3, background: 'var(--admin-yellow)', width: `${r.pct}%`, transition: 'width 0.5s ease' }} />
               </div>
-              <span className="text-xs text-gray-400 w-8 text-right">{r.count}</span>
+              <span style={{ font: '400 11px var(--admin-font-mono)', color: 'var(--admin-text-muted)', width: 30, textAlign: 'right' }}>{r.count}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="flex gap-3 mb-6 flex-wrap items-center">
-        {['all', '5', '4', '3', '2', '1'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${filter === f ? 'bg-white text-gray-900' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-            {f === 'all' ? 'All' : `${f} ★`}
-          </button>
-        ))}
-        <input type="text" placeholder="Search reviews..." value={search} onChange={e => setSearch(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ml-auto w-64" />
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['all', '5', '4', '3', '2', '1'].map(f => (
+            <button key={f} className={`admin-filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+              {f === 'all' ? 'All' : `${f} ★`}
+            </button>
+          ))}
+        </div>
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input className="admin-search" placeholder="Search reviews..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 240 }} />
+        </div>
       </div>
 
-      {/* REVIEWS LIST */}
-      <div className="space-y-3">
+      {/* Reviews List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
-            <div className="text-5xl mb-3">⭐</div>
-            <p className="text-gray-400">No reviews found</p>
+          <div className="admin-empty">
+            <div className="admin-empty-icon">⭐</div>
+            <h3>No reviews found</h3>
           </div>
         ) : filtered.map(review => (
-          <div key={review.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-sm font-bold">
-                    {(review.user_name?.[0] || '?').toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm">{review.user_name || 'Anonymous'}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">{[1,2,3,4,5].map(s => <span key={s} className={`text-sm ${s <= review.rating ? 'text-yellow-400' : 'text-gray-600'}`}>★</span>)}</div>
-                      <span className="text-xs text-gray-500">{new Date(review.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
+          <div key={review.id} className="admin-card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 18, background: 'linear-gradient(135deg, var(--admin-accent), rgba(232,69,96,0.6))', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '600 14px var(--admin-font-ui)', color: 'white', flexShrink: 0 }}>
+                {(review.user_name?.[0] || '?').toUpperCase()}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{review.user_name || 'Anonymous'}</span>
+                  <span style={{ display: 'flex', gap: 1 }}>
+                    {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 13, color: s <= review.rating ? 'var(--admin-yellow)' : 'var(--admin-surface-3)' }}>★</span>)}
+                  </span>
+                  <span style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{npFullDate(review.created_at)}</span>
                 </div>
-                <p className="text-sm text-gray-300 ml-12">{review.comment}</p>
+                <p style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text-soft)', margin: 0, lineHeight: 1.5 }}>{review.comment}</p>
                 {review.product_id && products[review.product_id] && (
-                  <div className="ml-12 mt-2 flex items-center gap-2 bg-gray-800/50 rounded-lg px-3 py-1.5">
-                    {products[review.product_id].image_url && (
-                      <img src={products[review.product_id].image_url} alt="" className="w-6 h-6 rounded object-cover" />
-                    )}
-                    <span className="text-xs text-gray-300 font-medium">{products[review.product_id].name}</span>
-                    <span className="text-xs text-gray-500">· Rs. {products[review.product_id].price?.toLocaleString()}</span>
+                  <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 10px', borderRadius: 6, background: 'var(--admin-surface-2)', border: '1px solid var(--admin-border)' }}>
+                    {products[review.product_id].image_url && <img src={products[review.product_id].image_url} alt="" style={{ width: 20, height: 20, borderRadius: 4, objectFit: 'cover' }} />}
+                    <span style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-soft)' }}>{products[review.product_id].name}</span>
+                    <span style={{ font: '400 11px var(--admin-font-mono)', color: 'var(--admin-text-muted)' }}>Rs. {products[review.product_id].price?.toLocaleString()}</span>
                   </div>
                 )}
               </div>
-              <button onClick={() => deleteReview(review.id)}
-                className="bg-red-600/20 text-red-300 border border-red-500/30 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-600/40 transition flex-shrink-0">
-                🗑️
-              </button>
+              <button onClick={() => deleteReview(review.id)} style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--admin-border)', background: 'transparent', color: 'var(--admin-text-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--admin-red)'; e.currentTarget.style.color = 'var(--admin-red)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--admin-border)'; e.currentTarget.style.color = 'var(--admin-text-soft)' }}>🗑️</button>
             </div>
           </div>
         ))}

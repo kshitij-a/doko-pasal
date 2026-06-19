@@ -12,107 +12,86 @@ function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQui
 }) {
   const [currentImg, setCurrentImg] = useState(0)
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || '')
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
   const images = product.image_urls?.length > 0
     ? product.image_urls
     : product.image_url ? [product.image_url] : []
 
   return (
-    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group">
-      {/* IMAGE SLIDER */}
+    <div className="product-card group">
       <Link href={`/products/${product.id}`}>
-        <div className="relative bg-gray-100 aspect-[3/4] overflow-hidden cursor-pointer">
+        <div className="product-image-wrap">
           {images.length > 0 ? (
             <>
-              <img src={images[currentImg]} alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <img src={images[currentImg]} alt={product.name} className="w-full h-full object-cover" />
               {images.length > 1 && (
                 <>
                   <button onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i - 1 + images.length) % images.length) }}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white w-8 h-8 rounded-full text-lg font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">‹</button>
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-[#1E1A16] w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">‹</button>
                   <button onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i + 1) % images.length) }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white w-8 h-8 rounded-full text-lg font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">›</button>
-                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                    {images.map((_: any, i: number) => (
-                      <button key={i} onClick={(e) => { e.preventDefault(); setCurrentImg(i) }}
-                        className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentImg ? 'bg-white scale-125' : 'bg-white/50'}`} />
-                    ))}
-                  </div>
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-[#1E1A16] w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">›</button>
                 </>
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">
-              {product.category === "Men's Wear" ? '👔' : product.category === "Women's Wear" ? '👗' : '🧒'}
-            </div>
+            <div className="w-full h-full flex items-center justify-center text-4xl bg-[#F5F2EE]">🧺</div>
           )}
           {/* Badges */}
-          <span className="absolute top-2 left-2 bg-red-700 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow">
-            {product.category}
-          </span>
+          {product.sale_price && product.sale_price < product.price && (
+            <span className="absolute top-3 left-3 badge-sale">SALE</span>
+          )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="bg-red-600 text-white px-3 py-1.5 rounded-full font-bold text-sm">Sold Out</span>
+            <div className="absolute inset-0 bg-[#1E1A16]/50 flex items-center justify-center">
+              <span className="bg-[#1E1A16] text-white px-4 py-1.5 rounded-full font-bold text-sm">Sold Out</span>
             </div>
           )}
           {product.stock > 0 && product.stock < 5 && (
-            <span className="absolute bottom-2 right-2 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-              Only {product.stock} left!
-            </span>
+            <span className="absolute bottom-3 right-3 badge-sale text-[10px]">Only {product.stock} left!</span>
           )}
-          {/* View detail hint */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
-            <span className="bg-white text-gray-800 px-3 py-1.5 rounded-full font-bold text-xs opacity-0 group-hover:opacity-100 transition shadow-lg">
-              View Details →
-            </span>
-          </div>
-          {/* Wishlist button */}
+          {/* Wishlist */}
           <button
             onClick={(e) => { e.preventDefault(); onToggleWishlist(product.id) }}
-            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition ${inWishlist ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:scale-110'}`}
-            title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow transition ${inWishlist ? 'bg-[#B5293A] text-white' : 'bg-white/80 hover:bg-white text-[#6B6560]'}`}
           >
-            {inWishlist ? '❤️' : '🤍'}
+            {inWishlist ? (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+            )}
           </button>
         </div>
       </Link>
 
-      {/* PRODUCT INFO */}
-      <div className="p-3 sm:p-4 flex flex-col flex-1">
+      <div className="product-body">
+        <p className="product-category">{product.category || 'Clothing'}</p>
         <Link href={`/products/${product.id}`}>
-          <h3 className="text-sm sm:text-base font-extrabold text-gray-900 mb-1 hover:text-red-600 transition cursor-pointer line-clamp-1">{product.name}</h3>
+          <h3 className="product-name hover:text-[#B5293A] transition cursor-pointer line-clamp-1">{product.name}</h3>
         </Link>
 
-        {/* SIZE SWATCHES */}
         {product.sizes && product.sizes.length > 0 && (
-          <div className="mb-2 sm:mb-3">
-            <div className="flex gap-1 flex-wrap">
-              {product.sizes.map((size: string) => (
-                <button key={size} onClick={() => setSelectedSize(size)}
-                  className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-bold border transition ${
-                    selectedSize === size
-                      ? 'bg-red-700 text-white border-red-700'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-red-400 hover:text-red-600'
-                  }`}>
-                  {size}
-                </button>
-              ))}
-            </div>
+          <div className="size-pills mb-3">
+            {product.sizes.map((size: string) => (
+              <button key={size} onClick={() => setSelectedSize(size)}
+                className={`size-pill ${selectedSize === size ? 'active' : ''}`}>
+                {size}
+              </button>
+            ))}
           </div>
         )}
 
-        {/* PRICE + BUTTONS */}
-        <div className="mt-auto pt-2 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-lg sm:text-xl font-extrabold text-red-700">Rs. {product.price?.toLocaleString()}</span>
-          </div>
-          <button
-            onClick={() => onQuickAdd(product, selectedSize)}
-            disabled={product.stock === 0}
-            className="w-full bg-red-700 text-white py-2 rounded-xl font-bold hover:bg-red-600 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm shadow">
-            {product.stock === 0 ? 'Sold Out' : '🛒 Quick Add'}
-          </button>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="price">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+          {product.sale_price && product.sale_price < product.price && (
+            <span className="price-old">Rs. {product.price?.toLocaleString()}</span>
+          )}
         </div>
+
+        <button
+          onClick={() => onQuickAdd(product, selectedSize)}
+          disabled={product.stock === 0}
+          className="btn-quick-add text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {product.stock === 0 ? 'Sold Out' : 'Add to Cart'}
+        </button>
       </div>
     </div>
   )
@@ -210,10 +189,10 @@ export default function Products() {
   const cartTotal = cart.reduce((sum: number, i: any) => sum + i.price * i.qty, 0)
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-28 sm:pb-0">
+    <main className="min-h-screen bg-[#FAF8F4] pb-28 sm:pb-0">
       {/* TOAST */}
       {toast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-5 py-2.5 rounded-2xl shadow-2xl font-semibold text-sm animate-fade-in">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-[#1E1A16] text-white px-5 py-2.5 rounded-2xl shadow-2xl font-semibold text-sm animate-fade-in">
           {toast}
         </div>
       )}
@@ -221,31 +200,30 @@ export default function Products() {
       <Navbar onCartOpen={() => setCartOpen(true)} cartCount={cartCount} wishlistCount={wishlistCount} />
 
       {/* HERO */}
-      <div className="bg-gradient-to-r from-red-800 via-red-700 to-red-600 text-white py-10 sm:py-14 px-6 sm:px-8 text-center">
-        <h1 className="text-3xl sm:text-5xl font-extrabold mb-2 sm:mb-3 drop-shadow">Our Collection</h1>
-        <p className="text-red-200 text-base sm:text-xl">Premium quality clothing — Made for Nepal 🇳🇵</p>
-        <p className="text-red-300 text-xs sm:text-sm mt-2">{products.length} products available</p>
+      <div className="bg-[#FAF8F4] py-10 sm:py-14 px-6 sm:px-8 text-center border-b border-[#E8E3DB]">
+        <h1 className="text-3xl sm:text-4xl font-bold text-[#1E1A16] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Our Collection</h1>
+        <p className="text-[#6B6560] text-base sm:text-lg">Premium quality clothing — Made for Nepal</p>
+        <div className="w-12 h-0.5 bg-[#B5293A] mx-auto mt-4 rounded-full" />
+        <p className="text-[#9E9994] text-xs sm:text-sm mt-3">{products.length} products available</p>
       </div>
 
       {/* FILTER BAR */}
-      <div className="bg-white shadow-sm px-4 py-3 sm:py-4 sticky top-[52px] sm:top-[56px] z-40">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="bg-white border-b border-[#E8E3DB] px-4 py-3 sm:py-4 sticky top-[88px] sm:top-[92px] z-40">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {categories.map(cat => (
               <button key={cat} onClick={() => setCategory(cat)}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold border-2 transition whitespace-nowrap flex-shrink-0 ${
-                  category === cat ? 'bg-red-700 text-white border-red-700' : 'bg-white text-gray-700 border-gray-200 hover:border-red-400'
-                }`}>
+                className={`filter-pill whitespace-nowrap flex-shrink-0 ${category === cat ? 'active' : ''}`}>
                 {cat}
               </button>
             ))}
-            <select value={sort} onChange={e => setSort(e.target.value)}
-              className="border border-gray-300 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white flex-shrink-0">
-              <option value="newest">Newest</option>
-              <option value="price-low">Price ↑</option>
-              <option value="price-high">Price ↓</option>
-            </select>
           </div>
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white flex-shrink-0 font-semibold text-[#6B6560] cursor-pointer">
+            <option value="newest">Newest</option>
+            <option value="price-low">Price ↑</option>
+            <option value="price-high">Price ↓</option>
+          </select>
         </div>
       </div>
 
@@ -253,20 +231,20 @@ export default function Products() {
       <div className="max-w-6xl mx-auto px-4 py-6 sm:py-10">
         {loading ? (
           <div className="text-center py-24">
-            <div className="w-14 h-14 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500 text-base sm:text-lg">Loading products...</p>
+            <div className="w-14 h-14 border-4 border-[#B5293A] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-[#6B6560] text-base sm:text-lg">Loading products...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-6xl mb-4">🧺</div>
-            <p className="text-gray-500 text-lg font-semibold">No products found</p>
+            <p className="text-[#6B6560] text-lg font-semibold">No products found</p>
             <button onClick={() => { setCategory('All'); setSearch('') }}
-              className="mt-4 text-red-600 font-bold text-sm hover:underline">Clear filters</button>
+              className="mt-4 text-[#B5293A] font-bold text-sm hover:underline">Clear filters</button>
           </div>
         ) : (
           <>
-            <p className="text-gray-500 text-xs sm:text-sm mb-4 sm:mb-6">{filtered.length} product{filtered.length !== 1 ? 's' : ''} found</p>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+            <p className="text-[#9E9994] text-xs sm:text-sm mb-4 sm:mb-6">{filtered.length} product{filtered.length !== 1 ? 's' : ''} found</p>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
               {filtered.map((product: any) => (
                 <ProductCard
                   key={product.id}

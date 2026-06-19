@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { npTime } from '../lib/timezone'
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -117,9 +118,11 @@ export default function ChatWidget() {
     if (inserted) {
       setMessages(prev => prev.some(m => m.id === inserted.id) ? prev : [...prev, inserted])
     }
+    const { data: convData } = await supabase.from('conversations').select('unread_count').eq('id', conversationId).single()
     await supabase.from('conversations').update({
       last_message: content.trim() || (mediaType === 'image' ? '📷 Photo' : '🎥 Video'),
       last_message_at: new Date().toISOString(),
+      unread_count: (convData?.unread_count || 0) + 1,
     }).eq('id', conversationId)
 
     setInput('')
@@ -223,7 +226,7 @@ export default function ChatWidget() {
                       <p className="text-sm leading-relaxed">{msg.content}</p>
                     )}
                     <p className={`text-xs mt-1 ${msg.is_admin ? 'text-gray-400' : 'text-white/60'}`}>
-                      {new Date(msg.created_at).toLocaleTimeString('en-NP', { hour: '2-digit', minute: '2-digit' })}
+                      {npTime(msg.created_at)}
                     </p>
                   </div>
                 </div>

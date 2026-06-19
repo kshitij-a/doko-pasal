@@ -4,11 +4,11 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 
 const SETTINGS_GROUPS = [
-  { label: 'Store Info', keys: ['store_name', 'store_tagline', 'store_logo', 'about_text'] },
-  { label: 'Announcements', keys: ['announcement_text', 'announcement_active'] },
-  { label: 'Contact', keys: ['contact_email', 'contact_phone', 'contact_address', 'whatsapp_number'] },
-  { label: 'Social Media', keys: ['facebook_url', 'instagram_url', 'tiktok_url', 'twitter_url'] },
-  { label: 'Policies', keys: ['delivery_info', 'return_info'] },
+  { label: 'Store Info', icon: '🏪', keys: ['store_name', 'store_tagline', 'store_logo', 'about_text'] },
+  { label: 'Announcements', icon: '📢', keys: ['announcement_text', 'announcement_active'] },
+  { label: 'Contact', icon: '📞', keys: ['contact_email', 'contact_phone', 'contact_address', 'whatsapp_number'] },
+  { label: 'Social Media', icon: '📱', keys: ['facebook_url', 'instagram_url', 'tiktok_url', 'twitter_url'] },
+  { label: 'Policies', icon: '📋', keys: ['delivery_info', 'return_info'] },
 ]
 
 export default function AdminSettings() {
@@ -41,13 +41,9 @@ export default function AdminSettings() {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings })
-      })
-      showToast('✅ Settings saved successfully')
-    } catch (e) { showToast('❌ Failed to save') }
+      await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) })
+      showToast('Settings saved successfully')
+    } catch (e) { showToast('Failed to save') }
     setSaving(false)
   }
 
@@ -64,83 +60,80 @@ export default function AdminSettings() {
     setUploadingLogo(false)
   }
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading settings...</div>
 
   return (
-    <div className="p-8 text-white">
-      {toast && <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm border border-gray-700">{toast}</div>}
+    <div>
+      {toast && <div className="admin-toast" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--admin-green)', border: '1px solid rgba(34,197,94,0.3)' }}>{toast}</div>}
 
-      <div className="flex justify-between items-center mb-8">
+      <div className="admin-page-header">
         <div>
-          <h1 className="text-3xl font-extrabold">⚙️ Store Settings</h1>
-          <p className="text-gray-400 mt-1">Configure your store details</p>
+          <h1 className="admin-page-title">Settings</h1>
+          <p className="admin-page-subtitle">Configure your store</p>
         </div>
-        <button onClick={saveSettings} disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-bold transition disabled:opacity-50">
-          {saving ? 'Saving...' : '💾 Save All Settings'}
+        <button className="btn-admin-primary" onClick={saveSettings} disabled={saving}>
+          {saving ? 'Saving...' : 'Save All Settings'}
         </button>
       </div>
 
-      <div className="space-y-6">
-        {/* Store Logo */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h2 className="text-lg font-bold mb-4">🏪 Store Logo</h2>
-          <div className="flex items-center gap-6">
-            {settings.store_logo ? (
-              <img src={settings.store_logo} alt="Logo" className="w-20 h-20 rounded-xl object-cover bg-gray-800" />
-            ) : (
-              <div className="w-20 h-20 rounded-xl bg-gray-800 flex items-center justify-center text-3xl">🧺</div>
-            )}
-            <div>
-              <label className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl font-bold text-sm cursor-pointer transition inline-block">
-                {uploadingLogo ? 'Uploading...' : '📷 Upload Logo'}
-              </label>
-              <input type="file" accept="image/*" onChange={uploadLogo} className="hidden" />
-              <p className="text-xs text-gray-500 mt-2">Recommended: 200x200px, PNG or SVG</p>
-            </div>
+      {/* Store Logo */}
+      <div className="admin-card" style={{ padding: 20, marginBottom: 16 }}>
+        <h3 style={{ font: '600 15px var(--admin-font-ui)', color: 'var(--admin-text)', marginBottom: 12 }}>Store Logo</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {settings.store_logo ? (
+            <img src={settings.store_logo} alt="Logo" style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', background: 'var(--admin-surface-2)' }} />
+          ) : (
+            <div style={{ width: 72, height: 72, borderRadius: 12, background: 'var(--admin-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-muted)', fontSize: 28 }}>🧺</div>
+          )}
+          <div>
+            <label style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-2)', color: 'var(--admin-text-soft)', font: '500 12px var(--admin-font-ui)', cursor: 'pointer', display: 'inline-block' }}>
+              {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+              <input type="file" accept="image/*" onChange={uploadLogo} style={{ display: 'none' }} />
+            </label>
+            <p style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', marginTop: 6 }}>200x200px recommended, PNG or SVG</p>
           </div>
         </div>
-
-        {SETTINGS_GROUPS.map(group => (
-          <div key={group.label} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-lg font-bold mb-4">
-              {group.label === 'Store Info' ? '🏪' : group.label === 'Announcements' ? '📢' : group.label === 'Contact' ? '📞' : group.label === 'Social Media' ? '📱' : '📋'} {group.label}
-            </h2>
-            <div className="space-y-4">
-              {group.keys.map(key => {
-                const isToggle = key === 'announcement_active'
-                const isLong = ['about_text', 'delivery_info', 'return_info'].includes(key)
-                return (
-                  <div key={key}>
-                    <label className="block text-sm font-semibold text-gray-300 mb-1 capitalize">
-                      {key.replace(/_/g, ' ').replace('url', 'URL').replace('info', 'Information')}
-                    </label>
-                    {isToggle ? (
-                      <button onClick={() => setSettings({ ...settings, [key]: settings[key] === 'true' ? 'false' : 'true' })}
-                        className={`px-4 py-2 rounded-xl font-bold text-sm transition ${settings[key] === 'true' ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                        {settings[key] === 'true' ? '✅ Active' : '⬜ Inactive'}
-                      </button>
-                    ) : isLong ? (
-                      <textarea value={settings[key] || ''} onChange={e => setSettings({ ...settings, [key]: e.target.value })}
-                        rows={3} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
-                    ) : (
-                      <input type={['contact_email'].includes(key) ? 'email' : ['contact_phone', 'whatsapp_number'].includes(key) ? 'tel' : 'text'}
-                        value={settings[key] || ''} onChange={e => setSettings({ ...settings, [key]: e.target.value })}
-                        placeholder={`Enter ${key.replace(/_/g, ' ')}`}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <button onClick={saveSettings} disabled={saving}
-          className="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-bold transition disabled:opacity-50 text-lg">
-          {saving ? 'Saving...' : '💾 Save All Settings'}
+      {/* Settings Groups */}
+      {SETTINGS_GROUPS.map(group => (
+        <div key={group.label} className="admin-card" style={{ padding: 20, marginBottom: 16 }}>
+          <h3 style={{ font: '600 15px var(--admin-font-ui)', color: 'var(--admin-text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>{group.icon}</span> {group.label}
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {group.keys.map(key => {
+              const isToggle = key === 'announcement_active'
+              const isLong = ['about_text', 'delivery_info', 'return_info'].includes(key)
+              const label = key.replace(/_/g, ' ').replace('url', 'URL').replace('info', 'Information')
+              return (
+                <div key={key}>
+                  <label className="admin-label" style={{ textTransform: 'capitalize' }}>{label}</label>
+                  {isToggle ? (
+                    <button onClick={() => setSettings({ ...settings, [key]: settings[key] === 'true' ? 'false' : 'true' })}
+                      style={{
+                        padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
+                        background: settings[key] === 'true' ? 'var(--admin-green)' : 'var(--admin-surface-3)',
+                        color: settings[key] === 'true' ? 'white' : 'var(--admin-text-muted)',
+                      }}>
+                      {settings[key] === 'true' ? '✅ Active' : '⬜ Inactive'}
+                    </button>
+                  ) : isLong ? (
+                    <textarea className="admin-input" rows={3} value={settings[key] || ''} onChange={e => setSettings({ ...settings, [key]: e.target.value })} placeholder={`Enter ${label}`} style={{ resize: 'vertical' }} />
+                  ) : (
+                    <input className="admin-input" type={['contact_email'].includes(key) ? 'email' : ['contact_phone', 'whatsapp_number'].includes(key) ? 'tel' : 'text'} value={settings[key] || ''} onChange={e => setSettings({ ...settings, [key]: e.target.value })} placeholder={`Enter ${label}`} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Save Bottom */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+        <button className="btn-admin-primary" onClick={saveSettings} disabled={saving} style={{ padding: '10px 24px' }}>
+          {saving ? 'Saving...' : 'Save All Settings'}
         </button>
       </div>
     </div>

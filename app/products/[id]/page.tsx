@@ -7,6 +7,7 @@ import Navbar from '../../../components/Navbar'
 import CartDrawer from '../../../components/CartDrawer'
 import MobileBottomBar from '../../../components/MobileBottomBar'
 import { logActivity } from '../../../lib/activity'
+import { npFullDate } from '../../../lib/timezone'
 
 export default function ProductDetail() {
   const router = useRouter()
@@ -399,7 +400,7 @@ export default function ProductDetail() {
                         </div>
                       </div>
                       <p className="text-gray-400 text-xs">
-                        {new Date(review.created_at).toLocaleDateString('en-NP', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {npFullDate(review.created_at)}
                       </p>
                     </div>
                     <p className="text-gray-600">{review.comment}</p>

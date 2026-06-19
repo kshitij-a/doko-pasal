@@ -1,17 +1,6 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import '../globals.css'
 import AdminSidebarWrapper from '../../components/AdminSidebarWrapper'
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
 
 export const metadata: Metadata = {
   title: 'Doko Pasal Admin',
@@ -20,9 +9,9 @@ export const metadata: Metadata = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} min-h-full flex`}>
+    <div style={{ background: 'var(--admin-bg)', minHeight: '100vh' }}>
       <AdminSidebarWrapper />
-      <main className="flex-1 ml-60 bg-gray-950 min-h-screen">
+      <main className="admin-page">
         {children}
       </main>
     </div>

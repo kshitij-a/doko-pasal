@@ -2,17 +2,26 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { npDateTime } from '../../../lib/timezone'
 
 const ACTION_TYPES = [
-  { value: '', label: 'All Actions' },
-  { value: 'page_view', label: '👁️ Page Views' },
-  { value: 'add_to_cart', label: '🛒 Add to Cart' },
+  { value: '', label: 'All' },
+  { value: 'page_view', label: '👁️ Views' },
+  { value: 'add_to_cart', label: '🛒 Cart' },
   { value: 'checkout', label: '💳 Checkout' },
   { value: 'purchase', label: '🛍️ Purchase' },
   { value: 'signup', label: '👤 Signups' },
   { value: 'login', label: '🔑 Logins' },
-  { value: 'wishlist', label: '❤️ Wishlist' },
 ]
+
+const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
+  purchase: { bg: 'rgba(34,197,94,0.1)', color: 'var(--admin-green)' },
+  signup: { bg: 'rgba(59,130,246,0.1)', color: 'var(--admin-blue)' },
+  login: { bg: 'rgba(168,85,247,0.1)', color: 'var(--admin-purple)' },
+  checkout: { bg: 'rgba(245,158,11,0.1)', color: 'var(--admin-yellow)' },
+  add_to_cart: { bg: 'rgba(232,69,96,0.1)', color: 'var(--admin-accent)' },
+  page_view: { bg: 'var(--admin-surface-2)', color: 'var(--admin-text-muted)' },
+}
 
 export default function AdminActivity() {
   const router = useRouter()
@@ -24,7 +33,6 @@ export default function AdminActivity() {
   const [page, setPage] = useState(1)
 
   useEffect(() => { checkAdmin() }, [])
-
   useEffect(() => { fetchLogs() }, [search, actionFilter, page])
 
   const checkAdmin = async () => {
@@ -46,109 +54,102 @@ export default function AdminActivity() {
     setLoading(false)
   }
 
-  const getActionIcon = (action: string) => {
-    const map: Record<string, string> = {
-      page_view: '👁️', add_to_cart: '🛒', checkout: '💳', purchase: '🛍️',
-      signup: '👤', login: '🔑', wishlist: '❤️', logout: '🚪',
-    }
-    return map[action] || '📝'
-  }
-
-  const getActionColor = (action: string) => {
-    const map: Record<string, string> = {
-      purchase: 'text-emerald-400', signup: 'text-blue-400', login: 'text-cyan-400',
-      checkout: 'text-yellow-400', add_to_cart: 'text-orange-400', page_view: 'text-gray-400',
-      wishlist: 'text-pink-400',
-    }
-    return map[action] || 'text-gray-400'
-  }
-
+  const ACTION_ICONS: Record<string, string> = { page_view: '👁️', add_to_cart: '🛒', checkout: '💳', purchase: '🛍️', signup: '👤', login: '🔑', wishlist: '❤️', logout: '🚪' }
   const totalPages = Math.ceil(total / 50)
 
   return (
-    <div className="p-8 text-white">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold">📋 Activity Log</h1>
-        <p className="text-gray-400 mt-1">{total} total activity entries</p>
+    <div>
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Activity Log</h1>
+          <p className="admin-page-subtitle">{total} total entries</p>
+        </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="flex gap-3 mb-6 flex-wrap items-center">
-        <input type="text" placeholder="🔍 Search by email or name..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 w-72" />
-        <div className="flex gap-1 bg-gray-800 rounded-xl p-1 overflow-x-auto">
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative' }}>
+          <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input className="admin-search" placeholder="Search by name or email..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} style={{ width: 260 }} />
+        </div>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--admin-surface)', padding: 3, borderRadius: 8, border: '1px solid var(--admin-border)' }}>
           {ACTION_TYPES.map(a => (
             <button key={a.value} onClick={() => { setActionFilter(a.value); setPage(1) }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${actionFilter === a.value ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              {a.label}
-            </button>
+              style={{
+                padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                background: actionFilter === a.value ? 'var(--admin-accent)' : 'transparent',
+                color: actionFilter === a.value ? 'white' : 'var(--admin-text-muted)',
+                transition: 'all 0.15s',
+              }}>{a.label}</button>
           ))}
         </div>
       </div>
 
-      {/* LOGS */}
-      {loading ? (
-        <div className="text-center py-20"><div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto" /></div>
-      ) : logs.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
-          <div className="text-5xl mb-3">📋</div>
-          <p className="text-gray-400">No activity logs found</p>
-          <p className="text-gray-500 text-sm mt-2">Activity will appear here as users interact with the store</p>
-        </div>
-      ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+      {/* Logs Table */}
+      <div className="admin-table-container">
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading...</div>
+        ) : logs.length === 0 ? (
+          <div className="admin-empty">
+            <div className="admin-empty-icon">📋</div>
+            <h3>No activity found</h3>
+            <p>Activity will appear here as users interact with the store</p>
+          </div>
+        ) : (
+          <>
+            <table className="admin-table">
               <thead>
-                <tr className="border-b border-gray-800">
-                  {['Action', 'User', 'Page', 'Details', 'Time'].map(h => (
-                    <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase">{h}</th>
-                  ))}
+                <tr>
+                  <th>Action</th>
+                  <th>User</th>
+                  <th>Page</th>
+                  <th>Details</th>
+                  <th>Time</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map(log => (
-                  <tr key={log.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
-                    <td className="px-6 py-3">
-                      <span className={`flex items-center gap-2 font-semibold text-sm ${getActionColor(log.action)}`}>
-                        {getActionIcon(log.action)} {log.action.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <p className="text-sm font-semibold truncate max-w-[200px]">{log.user_name || '—'}</p>
-                      <p className="text-xs text-gray-500 truncate max-w-[200px]">{log.user_email || '—'}</p>
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-400">{log.page || '—'}</td>
-                    <td className="px-6 py-3">
-                      {log.details ? (
-                        <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded-lg font-mono max-w-[200px] truncate inline-block">
-                          {typeof log.details === 'object' ? JSON.stringify(log.details).slice(0, 60) : String(log.details).slice(0, 60)}
+                {logs.map(log => {
+                  const ac = ACTION_COLORS[log.action] || ACTION_COLORS.page_view
+                  return (
+                    <tr key={log.id}>
+                      <td>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, background: ac.bg, color: ac.color, font: '500 12px var(--admin-font-ui)' }}>
+                          {ACTION_ICONS[log.action] || '📝'} {log.action.replace(/_/g, ' ')}
                         </span>
-                      ) : '—'}
-                    </td>
-                    <td className="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">
-                      {new Date(log.created_at).toLocaleString('en-NP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td>
+                        <div style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.user_name || '—'}</div>
+                        <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.user_email || '—'}</div>
+                      </td>
+                      <td style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-soft)' }}>{log.page || '—'}</td>
+                      <td>
+                        {log.details ? (
+                          <span style={{ font: '400 11px var(--admin-font-mono)', color: 'var(--admin-text-muted)', padding: '2px 8px', borderRadius: 4, background: 'var(--admin-surface-2)', maxWidth: 200, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {typeof log.details === 'object' ? JSON.stringify(log.details).slice(0, 50) : String(log.details).slice(0, 50)}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', whiteSpace: 'nowrap' }}>
+                        {npDateTime(log.created_at)}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
-          </div>
 
-          {/* PAGINATION */}
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center px-6 py-4 border-t border-gray-800">
-              <span className="text-sm text-gray-400">Page {page} of {totalPages}</span>
-              <div className="flex gap-2">
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-30 transition">← Prev</button>
-                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-30 transition">Next →</button>
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--admin-border)' }}>
+                <span style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>Page {page} of {totalPages}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="btn-admin-ghost" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</button>
+                  <button className="btn-admin-ghost" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

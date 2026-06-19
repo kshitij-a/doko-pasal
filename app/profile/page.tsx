@@ -126,7 +126,7 @@ export default function ProfilePage() {
                 <h2 className="text-3xl font-extrabold">Account Details</h2>
                 <p className="text-slate-400">Edit your personal information here.</p>
               </div>
-              <span className="text-sm text-slate-500">Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}</span>
+              <span className="text-sm text-slate-500">Member since {user?.created_at ? (() => { const hasTZ = /[Zz]|[+-]\d{2}(:\d{2})?$/.test(user.created_at.trim()); return new Date(hasTZ ? user.created_at : user.created_at + 'Z').toLocaleDateString('en-US', { timeZone: 'Asia/Kathmandu' }) })() : '—'}</span>
             </div>
 
             {error && <div className="mb-4 rounded-2xl bg-red-600/10 border border-red-600 text-red-200 px-4 py-3">{error}</div>}

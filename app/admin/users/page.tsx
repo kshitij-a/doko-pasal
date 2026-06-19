@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { npFullDate } from '../../../lib/timezone'
 
 export default function AdminUsers() {
   const router = useRouter()
@@ -11,7 +12,7 @@ export default function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({ full_name: '', phone: '', email: '' })
-  const [message, setMessage] = useState('')
+  const [toast, setToast] = useState('')
   const [userOrders, setUserOrders] = useState<any[]>([])
   const [showOrders, setShowOrders] = useState(false)
 
@@ -26,91 +27,40 @@ export default function AdminUsers() {
   }
 
   const fetchUsers = async () => {
-    try {
-      const res = await fetch('/api/admin/users')
-      const data = await res.json()
-      setUsers(data.users || [])
-    } catch (e) { console.error(e) }
+    try { const res = await fetch('/api/admin/users'); const data = await res.json(); setUsers(data.users || []) } catch (e) { console.error(e) }
     setLoading(false)
   }
 
-  const showMessage = (msg: string) => {
-    setMessage(msg)
-    setTimeout(() => setMessage(''), 3000)
-  }
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   const updateUser = async () => {
     if (!selectedUser) return
     try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: selectedUser.id,
-          data: {
-            full_name: editForm.full_name,
-            phone: editForm.phone,
-          }
-        })
-      })
-      if (res.ok) {
-        showMessage('✅ User updated successfully')
-        setEditMode(false)
-        fetchUsers()
-        setSelectedUser({ ...selectedUser, full_name: editForm.full_name, phone: editForm.phone })
-      }
-    } catch (e) { showMessage('❌ Failed to update user') }
+      const res = await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: selectedUser.id, data: { full_name: editForm.full_name, phone: editForm.phone } }) })
+      if (res.ok) { showToast('User updated'); setEditMode(false); fetchUsers() }
+    } catch (e) { showToast('Failed') }
   }
 
   const toggleBan = async (user: any) => {
     const newBanned = !user.banned
-    const reason = newBanned ? prompt('Ban reason (optional):') : ''
+    const reason = newBanned ? prompt('Ban reason:') : ''
     if (newBanned && reason === null) return
-
     try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          data: {
-            full_name: user.full_name || '',
-            phone: user.phone || '',
-            banned: newBanned,
-            ban_reason: newBanned ? reason : '',
-          }
-        })
-      })
+      const res = await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, data: { full_name: user.full_name || '', phone: user.phone || '', banned: newBanned, ban_reason: newBanned ? reason : '' } }) })
       const json = await res.json()
-      if (json.success) {
-        showMessage(newBanned ? '🚫 User banned' : '✅ User unbanned')
-        fetchUsers()
-      } else if (json.error?.includes('service_role')) {
-        showMessage('⚠️ Ban requires SUPABASE_SERVICE_ROLE_KEY. Add it to .env.local')
-      } else {
-        showMessage('⚠️ ' + (json.error || 'Ban saved locally'))
-        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, banned: newBanned, ban_reason: newBanned ? reason : '' } : u))
-      }
-    } catch (e) { showMessage('❌ Failed') }
+      if (json.success) { showToast(newBanned ? 'User banned' : 'User unbanned'); fetchUsers() }
+      else showToast(json.error || 'Failed')
+    } catch (e) { showToast('Failed') }
   }
 
   const deleteUser = async (user: any) => {
-    if (!confirm(`⚠️ PERMANENTLY delete ${user.email}? This cannot be undone.`)) return
-    if (!confirm('Are you REALLY sure? All their data will be lost.')) return
-
+    if (!confirm(`Delete ${user.email}? This cannot be undone.`)) return
     try {
       const res = await fetch(`/api/admin/users?userId=${user.id}`, { method: 'DELETE' })
       const json = await res.json()
-      if (json.success) {
-        showMessage('🗑️ User deleted permanently')
-        setSelectedUser(null)
-        fetchUsers()
-      } else if (json.error?.includes('service_role')) {
-        showMessage('⚠️ Delete requires SUPABASE_SERVICE_ROLE_KEY. Add it to .env.local')
-      } else {
-        showMessage('⚠️ ' + (json.error || 'Failed to delete'))
-      }
-    } catch (e) { showMessage('❌ Failed to delete user') }
+      if (json.success) { showToast('User deleted'); setSelectedUser(null); fetchUsers() }
+      else showToast(json.error || 'Failed')
+    } catch (e) { showToast('Failed') }
   }
 
   const viewUserOrders = async (user: any) => {
@@ -125,164 +75,145 @@ export default function AdminUsers() {
     return !q || u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q) || u.phone?.includes(q)
   })
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  const totalSpent = users.reduce((sum, u) => sum + (u.totalSpent || 0), 0)
+  const bannedCount = users.filter(u => u.banned).length
+
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading users...</div>
 
   return (
-    <div className="p-8 text-white">
-      {message && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm border border-gray-700">
-          {message}
-        </div>
-      )}
+    <div>
+      {toast && <div className="admin-toast" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--admin-green)', border: '1px solid rgba(34,197,94,0.3)' }}>{toast}</div>}
 
-      <div className="flex justify-between items-center mb-8">
+      <div className="admin-page-header">
         <div>
-          <h1 className="text-3xl font-extrabold">👥 User Management</h1>
-          <p className="text-gray-400 mt-1">{users.length} registered users</p>
+          <h1 className="admin-page-title">Users</h1>
+          <p className="admin-page-subtitle">{users.length} users · Rs. {totalSpent.toLocaleString()} total spent{bannedCount > 0 ? ` · ${bannedCount} banned` : ''}</p>
         </div>
-        <input type="text" placeholder="Search by name, email, phone..."
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 w-72" />
+        <div style={{ position: 'relative' }}>
+          <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input className="admin-search" placeholder="Search users..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 280 }} />
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_380px] gap-8">
-        {/* USER LIST */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-800">
-            <h2 className="font-bold">All Users</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16 }}>
+        {/* User List */}
+        <div className="admin-card" style={{ overflow: 'hidden', padding: 0 }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)' }}>
+            <h3 style={{ font: '600 14px var(--admin-font-ui)', color: 'var(--admin-text)' }}>All Users ({filtered.length})</h3>
           </div>
-          <div className="divide-y divide-gray-800/50 max-h-[70vh] overflow-y-auto">
+          <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             {filtered.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">No users found</div>
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--admin-text-muted)', fontSize: 13 }}>No users found</div>
             ) : filtered.map(user => (
-              <div key={user.id}
-                onClick={() => { setSelectedUser(user); setShowOrders(false); setEditMode(false) }}
-                className={`flex items-center gap-4 px-6 py-4 cursor-pointer transition ${selectedUser?.id === user.id ? 'bg-gray-800' : 'hover:bg-gray-800/50'}`}>
-                <div className="w-11 h-11 rounded-full overflow-hidden bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-lg font-bold flex-shrink-0">
-                  {user.avatar_url ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" /> :
-                    (user.full_name?.[0] || user.email?.[0] || '?').toUpperCase()}
+              <div key={user.id} onClick={() => { setSelectedUser(user); setShowOrders(false); setEditMode(false) }}
+                style={{
+                  padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer',
+                  background: selectedUser?.id === user.id ? 'var(--admin-surface-2)' : 'transparent',
+                  borderBottom: '1px solid var(--admin-border)', transition: 'background 0.15s',
+                }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 20, flexShrink: 0,
+                  background: user.avatar_url ? 'none' : 'linear-gradient(135deg, var(--admin-accent), rgba(232,69,96,0.6))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  font: '600 14px var(--admin-font-ui)', color: 'white', overflow: 'hidden',
+                }}>
+                  {user.avatar_url ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (user.full_name?.[0] || user.email?.[0] || '?').toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm truncate">{user.full_name || 'No name'}</p>
-                    {user.banned && <span className="bg-red-500/20 text-red-400 text-[10px] px-1.5 py-0.5 rounded font-bold">BANNED</span>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.full_name || 'No name'}</span>
+                    {user.banned && <span style={{ padding: '1px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.15)', color: 'var(--admin-red)', font: '600 10px var(--admin-font-ui)' }}>BANNED</span>}
                   </div>
-                  <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                  <p className="text-xs text-gray-500">{user.phone || 'No phone'} · {user.orderCount} orders · Rs. {user.totalSpent.toLocaleString()} spent</p>
+                  <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+                  <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>
+                    {user.orderCount || 0} orders · Rs. {(user.totalSpent || 0).toLocaleString()}
+                  </div>
                 </div>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
-                  {new Date(user.created_at).toLocaleDateString('en-NP', { month: 'short', year: 'numeric' })}
-                </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* USER DETAIL PANEL */}
-        <div className="space-y-4">
+        {/* Detail Panel */}
+        <div>
           {selectedUser ? (
-            <>
-              {/* Profile Card */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-2xl font-bold">
-                    {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover" /> :
-                      (selectedUser.full_name?.[0] || selectedUser.email?.[0] || '?').toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-bold text-lg">{selectedUser.full_name || 'No name'}</p>
-                    <p className="text-gray-400 text-sm">{selectedUser.email}</p>
-                    {selectedUser.banned && (
-                      <p className="text-red-400 text-xs font-bold mt-1">🚫 Banned: {selectedUser.ban_reason || 'No reason'}</p>
-                    )}
-                  </div>
+            <div className="admin-card" style={{ padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 24, background: 'linear-gradient(135deg, var(--admin-accent), rgba(232,69,96,0.6))', display: 'flex', alignItems: 'center', justifyContent: 'center', font: '700 18px var(--admin-font-ui)', color: 'white', overflow: 'hidden' }}>
+                  {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (selectedUser.full_name?.[0] || selectedUser.email?.[0] || '?').toUpperCase()}
                 </div>
-
-                {editMode ? (
-                  <div className="space-y-3 mb-4">
-                    <input type="text" value={editForm.full_name} onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
-                      placeholder="Full name" className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
-                    <input type="text" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                      placeholder="Phone" className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
-                    <div className="flex gap-2">
-                      <button onClick={updateUser} className="flex-1 bg-emerald-600 hover:bg-emerald-500 py-2 rounded-xl font-bold text-sm transition">Save</button>
-                      <button onClick={() => setEditMode(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-xl font-bold text-sm transition">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2 mb-4 text-sm">
-                    <div className="flex justify-between"><span className="text-gray-400">Phone</span><span>{selectedUser.phone || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-400">Joined</span><span>{new Date(selectedUser.created_at).toLocaleDateString()}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-400">Last Login</span><span>{selectedUser.last_sign_in ? new Date(selectedUser.last_sign_in).toLocaleDateString() : '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-400">Total Orders</span><span className="font-bold">{selectedUser.orderCount}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-400">Total Spent</span><span className="font-bold text-red-400">Rs. {selectedUser.totalSpent.toLocaleString()}</span></div>
-                  </div>
-                )}
-
-                <div className="flex gap-2 flex-wrap">
-                  {!editMode && (
-                    <button onClick={() => { setEditForm({ full_name: selectedUser.full_name, phone: selectedUser.phone, email: selectedUser.email }); setEditMode(true) }}
-                      className="bg-blue-600/20 text-blue-300 border border-blue-500/30 px-3 py-2 rounded-xl text-xs font-bold hover:bg-blue-600/40 transition">
-                      ✏️ Edit Profile
-                    </button>
-                  )}
-                  <button onClick={() => viewUserOrders(selectedUser)}
-                    className="bg-violet-600/20 text-violet-300 border border-violet-500/30 px-3 py-2 rounded-xl text-xs font-bold hover:bg-violet-600/40 transition">
-                    📦 View Orders
-                  </button>
-                  <button onClick={() => toggleBan(selectedUser)}
-                    className={`${selectedUser.banned ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-600/20 text-amber-300 border border-amber-500/30'} px-3 py-2 rounded-xl text-xs font-bold hover:opacity-80 transition`}>
-                    {selectedUser.banned ? '✅ Unban' : '🚫 Ban User'}
-                  </button>
-                  <button onClick={() => deleteUser(selectedUser)}
-                    className="bg-red-600/20 text-red-300 border border-red-500/30 px-3 py-2 rounded-xl text-xs font-bold hover:bg-red-600/40 transition">
-                    🗑️ Delete User
-                  </button>
+                <div>
+                  <div style={{ font: '600 15px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{selectedUser.full_name || 'No name'}</div>
+                  <div style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{selectedUser.email}</div>
+                  {selectedUser.banned && <div style={{ font: '500 11px var(--admin-font-ui)', color: 'var(--admin-red)', marginTop: 2 }}>Banned: {selectedUser.ban_reason || 'No reason'}</div>}
                 </div>
               </div>
 
-              {/* USER ORDERS */}
-              {showOrders && (
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                  <h3 className="font-bold mb-4">📦 Order History ({userOrders.length})</h3>
-                  {userOrders.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center py-4">No orders yet</p>
-                  ) : (
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {userOrders.map(order => (
-                        <div key={order.id} className="bg-gray-800/50 rounded-xl p-3">
-                          <div className="flex justify-between items-start mb-1">
-                            <span className="font-mono text-xs text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold capitalize ${
-                              order.order_status === 'delivered' ? 'bg-emerald-500/20 text-emerald-300' :
-                              order.order_status === 'cancelled' ? 'bg-red-500/20 text-red-300' :
-                              'bg-amber-500/20 text-amber-300'
-                            }`}>{order.order_status}</span>
-                          </div>
-                          <p className="text-sm font-bold text-red-400">Rs. {order.total_amount?.toLocaleString()}</p>
-                          <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString()}</p>
-                          {order.order_items && (
-                            <div className="mt-2 text-xs text-gray-400">
-                              {order.order_items.map((item: any, i: number) => (
-                                <span key={i}>{item.product_name} (x{item.quantity}){i < order.order_items.length - 1 ? ', ' : ''}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+              {editMode ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  <input className="admin-input" value={editForm.full_name} onChange={e => setEditForm({ ...editForm, full_name: e.target.value })} placeholder="Full name" />
+                  <input className="admin-input" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Phone" />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-admin-primary" style={{ flex: 1, padding: '8px 12px', fontSize: 12 }} onClick={updateUser}>Save</button>
+                    <button className="btn-admin-ghost" style={{ flex: 1, padding: '8px 12px', fontSize: 12 }} onClick={() => setEditMode(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  {[
+                    ['Phone', selectedUser.phone || '—'],
+                    ['Joined', npFullDate(selectedUser.created_at)],
+                    ['Last Login', selectedUser.last_sign_in ? npFullDate(selectedUser.last_sign_in) : '—'],
+                    ['Total Orders', String(selectedUser.orderCount || 0)],
+                    ['Total Spent', `Rs. ${(selectedUser.totalSpent || 0).toLocaleString()}`],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span style={{ color: 'var(--admin-text-muted)' }}>{label}</span>
+                      <span style={{ font: label === 'Total Spent' ? '600 13px var(--admin-font-mono)' : '400 13px var(--admin-font-ui)', color: label === 'Total Spent' ? 'var(--admin-accent)' : 'var(--admin-text)' }}>{value}</span>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
-            </>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {!editMode && <button className="btn-admin-ghost" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => { setEditForm({ full_name: selectedUser.full_name, phone: selectedUser.phone, email: selectedUser.email }); setEditMode(true) }}>Edit Profile</button>}
+                <button className="btn-admin-ghost" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => viewUserOrders(selectedUser)}>View Orders</button>
+                <button className="btn-admin-ghost" style={{ fontSize: 11, padding: '5px 10px', color: selectedUser.banned ? 'var(--admin-green)' : 'var(--admin-yellow)' }} onClick={() => toggleBan(selectedUser)}>
+                  {selectedUser.banned ? 'Unban' : 'Ban'}
+                </button>
+                <button className="btn-admin-ghost" style={{ fontSize: 11, padding: '5px 10px', color: 'var(--admin-red)' }} onClick={() => deleteUser(selectedUser)}>Delete</button>
+              </div>
+
+              {showOrders && (
+                <div style={{ marginTop: 16, borderTop: '1px solid var(--admin-border)', paddingTop: 16 }}>
+                  <h4 style={{ font: '600 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Order History ({userOrders.length})</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+                    {userOrders.length === 0 ? (
+                      <p style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textAlign: 'center', padding: 12 }}>No orders yet</p>
+                    ) : userOrders.map(order => (
+                      <div key={order.id} style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--admin-surface-2)', border: '1px solid var(--admin-border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ font: '500 11px var(--admin-font-mono)', color: 'var(--admin-text)' }}>#{order.id.slice(0, 8).toUpperCase()}</span>
+                          <span style={{
+                            padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, textTransform: 'capitalize',
+                            background: order.order_status === 'delivered' ? 'rgba(34,197,94,0.15)' : order.order_status === 'cancelled' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                            color: order.order_status === 'delivered' ? 'var(--admin-green)' : order.order_status === 'cancelled' ? 'var(--admin-red)' : 'var(--admin-yellow)',
+                          }}>{order.order_status}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                          <span style={{ font: '400 11px var(--admin-font-mono)', color: 'var(--admin-accent)' }}>Rs. {order.total_amount?.toLocaleString()}</span>
+                          <span style={{ font: '400 10px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{npFullDate(order.created_at)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
-              <div className="text-5xl mb-3">👈</div>
-              <p className="text-gray-400">Select a user to view details</p>
+            <div className="admin-card" style={{ padding: 40, textAlign: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>👈</div>
+              <p style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>Select a user to view details</p>
             </div>
           )}
         </div>

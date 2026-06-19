@@ -43,141 +43,117 @@ export default function AdminBanners() {
     if (!error) {
       const { data: urlData } = supabase.storage.from('banner-images').getPublicUrl(filePath)
       setForm({ ...form, image_url: urlData.publicUrl })
-    } else { showToast('❌ Upload failed') }
+    } else { showToast('Upload failed') }
     setUploading(false)
   }
 
   const saveBanner = async () => {
-    if (!form.image_url) { showToast('⚠️ Upload an image first'); return }
+    if (!form.image_url) { showToast('Upload an image first'); return }
     try {
       if (editId) {
-        await fetch('/api/admin/banners', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editId, ...form, position: Number(form.position) })
-        })
-        showToast('✅ Banner updated')
+        await fetch('/api/admin/banners', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, ...form, position: Number(form.position) }) })
+        showToast('Banner updated')
       } else {
-        await fetch('/api/admin/banners', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, position: Number(form.position) })
-        })
-        showToast('✅ Banner created')
+        await fetch('/api/admin/banners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, position: Number(form.position) }) })
+        showToast('Banner created')
       }
-      resetForm()
-      fetchBanners()
-    } catch (e) { showToast('❌ Failed') }
+      resetForm(); fetchBanners()
+    } catch (e) { showToast('Failed') }
   }
 
   const toggleActive = async (banner: any) => {
-    await fetch('/api/admin/banners', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: banner.id, active: !banner.active })
-    })
+    await fetch('/api/admin/banners', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: banner.id, active: !banner.active }) })
     fetchBanners()
   }
 
   const deleteBanner = async (banner: any) => {
     if (!confirm('Delete this banner?')) return
     await fetch(`/api/admin/banners?id=${banner.id}`, { method: 'DELETE' })
-    showToast('🗑️ Banner deleted')
-    fetchBanners()
+    showToast('Banner deleted'); fetchBanners()
   }
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading banners...</div>
 
   return (
-    <div className="p-8 text-white">
-      {toast && <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm border border-gray-700">{toast}</div>}
+    <div>
+      {toast && <div className="admin-toast" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--admin-green)', border: '1px solid rgba(34,197,94,0.3)' }}>{toast}</div>}
 
-      <div className="flex justify-between items-center mb-8">
+      <div className="admin-page-header">
         <div>
-          <h1 className="text-3xl font-extrabold">🖼️ Banner Management</h1>
-          <p className="text-gray-400 mt-1">{banners.length} homepage banners</p>
+          <h1 className="admin-page-title">Banners</h1>
+          <p className="admin-page-subtitle">{banners.length} homepage banners · {banners.filter(b => b.active).length} active</p>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true) }}
-          className="bg-blue-600 hover:bg-blue-500 px-5 py-3 rounded-xl font-bold transition">➕ Add Banner</button>
+        <button className="btn-admin-primary" onClick={() => { resetForm(); setShowForm(true) }}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          Add Banner
+        </button>
       </div>
 
+      {/* Form Modal */}
       {showForm && (
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 mb-8">
-          <h2 className="text-xl font-bold mb-5">{editId ? '✏️ Edit Banner' : '➕ New Banner'}</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-1">Title</label>
-              <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                placeholder="Banner title" className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-1">Subtitle</label>
-              <input type="text" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })}
-                placeholder="Banner subtitle" className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-1">Link URL</label>
-              <input type="text" value={form.link_url} onChange={e => setForm({ ...form, link_url: e.target.value })}
-                placeholder="/products" className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-1">Button Text</label>
-              <input type="text" value={form.button_text} onChange={e => setForm({ ...form, button_text: e.target.value })}
-                placeholder="Shop Now" className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-1">Position</label>
-              <input type="number" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-300 mb-1">Image</label>
-              <div className="flex gap-3 items-center">
-                <label htmlFor="banner-image-upload" className="bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-xl font-bold text-sm cursor-pointer transition">
-                  {uploading ? 'Uploading...' : '📷 Upload'}
-                </label>
-                <input id="banner-image-upload" type="file" accept="image/*" onChange={uploadImage} className="hidden" />
-                {form.image_url && <img src={form.image_url} alt="" className="w-16 h-10 rounded object-cover" />}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => { setShowForm(false); resetForm() }}>
+          <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 16, width: '100%', maxWidth: 560, padding: 28 }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ font: '600 18px var(--admin-font-ui)', color: 'var(--admin-text)', marginBottom: 20 }}>{editId ? 'Edit Banner' : 'New Banner'}</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div><label className="admin-label">Title</label><input className="admin-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Banner title" /></div>
+              <div><label className="admin-label">Subtitle</label><input className="admin-input" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} placeholder="Banner subtitle" /></div>
+              <div><label className="admin-label">Link URL</label><input className="admin-input" value={form.link_url} onChange={e => setForm({ ...form, link_url: e.target.value })} placeholder="/products" /></div>
+              <div><label className="admin-label">Button Text</label><input className="admin-input" value={form.button_text} onChange={e => setForm({ ...form, button_text: e.target.value })} placeholder="Shop Now" /></div>
+              <div><label className="admin-label">Position</label><input className="admin-input" type="number" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} /></div>
+              <div>
+                <label className="admin-label">Image</label>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <label style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-2)', color: 'var(--admin-text-soft)', font: '500 12px var(--admin-font-ui)', cursor: 'pointer' }}>
+                    {uploading ? 'Uploading...' : 'Upload'}
+                    <input type="file" accept="image/*" onChange={uploadImage} style={{ display: 'none' }} />
+                  </label>
+                  {form.image_url && <img src={form.image_url} alt="" style={{ width: 48, height: 32, borderRadius: 6, objectFit: 'cover' }} />}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex gap-3 mt-5">
-            <button onClick={saveBanner} className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-bold transition">
-              {editId ? 'Update' : 'Create'} Banner
-            </button>
-            <button onClick={resetForm} className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-xl font-bold transition">Cancel</button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+              <button className="btn-admin-ghost" onClick={() => { setShowForm(false); resetForm() }}>Cancel</button>
+              <button className="btn-admin-primary" onClick={saveBanner}>{editId ? 'Update' : 'Create'}</button>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="space-y-4">
+      {/* Banners List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {banners.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-16 text-center">
-            <div className="text-5xl mb-3">🖼️</div>
-            <p className="text-gray-400">No banners yet. Add one to display on the homepage!</p>
+          <div className="admin-empty">
+            <div className="admin-empty-icon">🖼️</div>
+            <h3>No banners yet</h3>
+            <p>Add a banner to display on the homepage</p>
           </div>
         ) : banners.map(banner => (
-          <div key={banner.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex items-center gap-6 p-4">
-            <img src={banner.image_url} alt={banner.title} className="w-40 h-24 rounded-xl object-cover bg-gray-800 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-bold">{banner.title || 'No title'}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${banner.active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gray-600/20 text-gray-400'}`}>
+          <div key={banner.id} className="admin-card" style={{ padding: 16, display: 'flex', gap: 16, alignItems: 'center' }}>
+            <div style={{ width: 140, height: 80, borderRadius: 8, overflow: 'hidden', background: 'var(--admin-surface-2)', flexShrink: 0 }}>
+              {banner.image_url ? <img src={banner.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-muted)', fontSize: 20 }}>🖼️</div>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ font: '500 14px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{banner.title || 'No title'}</span>
+                <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: banner.active ? 'rgba(34,197,94,0.15)' : 'var(--admin-surface-3)', color: banner.active ? 'var(--admin-green)' : 'var(--admin-text-muted)' }}>
                   {banner.active ? 'Active' : 'Inactive'}
                 </span>
-                <span className="text-xs text-gray-500">Pos: {banner.position}</span>
+                <span style={{ font: '400 10px var(--admin-font-mono)', color: 'var(--admin-text-muted)' }}>Pos: {banner.position}</span>
               </div>
-              <p className="text-sm text-gray-400 truncate">{banner.subtitle || 'No subtitle'} → {banner.link_url}</p>
+              <div style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {banner.subtitle || 'No subtitle'} → {banner.link_url}
+              </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button onClick={() => toggleActive(banner)}
-                className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-xl text-sm font-bold transition">
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={() => toggleActive(banner)} style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--admin-border)', background: 'transparent', color: 'var(--admin-text-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
                 {banner.active ? '⏸️' : '▶️'}
               </button>
-              <button onClick={() => { setForm({ title: banner.title, subtitle: banner.subtitle, image_url: banner.image_url, link_url: banner.link_url, button_text: banner.button_text, position: banner.position?.toString() || '0', active: banner.active }); setEditId(banner.id); setShowForm(true) }}
-                className="bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 px-3 py-2 rounded-xl text-sm font-bold transition">✏️</button>
+              <button onClick={() => { setForm({ title: banner.title, subtitle: banner.subtitle, image_url: banner.image_url, link_url: banner.link_url, button_text: banner.button_text, position: String(banner.position || '0'), active: banner.active }); setEditId(banner.id); setShowForm(true) }}
+                style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--admin-border)', background: 'transparent', color: 'var(--admin-text-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✏️</button>
               <button onClick={() => deleteBanner(banner)}
-                className="bg-red-600/20 text-red-300 hover:bg-red-600/40 px-3 py-2 rounded-xl text-sm font-bold transition">🗑️</button>
+                style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--admin-border)', background: 'transparent', color: 'var(--admin-text-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🗑️</button>
             </div>
           </div>
         ))}

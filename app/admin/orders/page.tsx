@@ -2,9 +2,17 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { npFullDate } from '../../../lib/timezone'
 
 const STATUS_OPTIONS = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  pending: { bg: 'rgba(245,158,11,0.1)', text: 'var(--admin-yellow)', border: 'rgba(245,158,11,0.25)' },
+  processing: { bg: 'rgba(59,130,246,0.1)', text: 'var(--admin-blue)', border: 'rgba(59,130,246,0.25)' },
+  shipped: { bg: 'rgba(168,85,247,0.1)', text: 'var(--admin-purple)', border: 'rgba(168,85,247,0.25)' },
+  delivered: { bg: 'rgba(34,197,94,0.1)', text: 'var(--admin-green)', border: 'rgba(34,197,94,0.25)' },
+  cancelled: { bg: 'rgba(239,68,68,0.1)', text: 'var(--admin-red)', border: 'rgba(239,68,68,0.25)' },
+}
+const PAYMENT_ICONS: Record<string, string> = { khalti: '💜', esewa: '💚', cod: '💵', bank: '🏦' }
 
 export default function AdminOrders() {
   const router = useRouter()
@@ -13,7 +21,7 @@ export default function AdminOrders() {
   const [filter, setFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => { checkAdmin() }, [])
 
@@ -26,99 +34,43 @@ export default function AdminOrders() {
   }
 
   const fetchOrders = async () => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false })
     if (data) setOrders(data)
     setLoading(false)
   }
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     setUpdating(orderId)
-    const { data, error } = await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId).select()
-    if (error) {
-      alert('Failed to update order status: ' + error.message)
-      console.error('orders.update error', error)
-      setUpdating(null)
-      return
-    }
-    if (data && data.length > 0) {
-      setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: newStatus } : o))
-    }
+    const { error } = await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId)
+    if (error) { alert('Failed: ' + error.message); setUpdating(null); return }
+    setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o))
     setUpdating(null)
   }
 
   const updatePayment = async (orderId: string, newStatus: string) => {
-    const { data, error } = await supabase.from('orders').update({ payment_status: newStatus }).eq('id', orderId).select()
-    if (error) {
-      alert('Failed to update payment status: ' + error.message)
-      console.error('orders.update error', error)
-      return
-    }
-    if (data && data.length > 0) {
-      setOrders(orders.map((o: any) => o.id === orderId ? { ...o, payment_status: newStatus } : o))
-    }
+    const { error } = await supabase.from('orders').update({ payment_status: newStatus }).eq('id', orderId)
+    if (error) { alert('Failed: ' + error.message); return }
+    setOrders(orders.map(o => o.id === orderId ? { ...o, payment_status: newStatus } : o))
   }
 
   const cancelOrder = async (orderId: string) => {
-    if (!confirm('Cancel this order? The customer will see it as cancelled.')) return
-    setCancellingId(orderId)
-    const { data, error } = await supabase.from('orders').update({
-      order_status: 'cancelled',
-      payment_status: 'cancelled',
-    }).eq('id', orderId).select()
-    if (error) {
-      alert('Failed to cancel order: ' + error.message)
-      setCancellingId(null)
-      console.error('orders.update cancel error', error)
-      return
-    }
-    if (data && data.length > 0) {
-      setOrders(orders.map((o: any) => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
-    }
-    setCancellingId(null)
+    if (!confirm('Cancel this order?')) return
+    const { error } = await supabase.from('orders').update({ order_status: 'cancelled', payment_status: 'cancelled' }).eq('id', orderId)
+    if (error) { alert('Failed: ' + error.message); return }
+    setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
   }
 
   const deleteOrder = async (orderId: string) => {
-    if (!confirm('Permanently DELETE this order? Cannot be undone.')) return
-    const { error: itemError } = await supabase.from('order_items').delete().eq('order_id', orderId)
-    if (itemError) {
-      alert('Failed to delete order items: ' + itemError.message)
-      console.error('order_items.delete error', itemError)
-      return
-    }
-    const { error: orderError } = await supabase.from('orders').delete().eq('id', orderId).select()
-    if (orderError) {
-      alert('Failed to delete order: ' + orderError.message)
-      console.error('orders.delete error', orderError)
-      return
-    }
-    setOrders(orders.filter((o: any) => o.id !== orderId))
+    if (!confirm('Permanently DELETE this order?')) return
+    await supabase.from('order_items').delete().eq('order_id', orderId)
+    await supabase.from('orders').delete().eq('id', orderId)
+    setOrders(orders.filter(o => o.id !== orderId))
   }
 
-  const statusBadge = (s: string) => {
-    const map: Record<string, string> = {
-      pending: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
-      processing: 'bg-blue-500/20 text-blue-300 border border-blue-500/40',
-      shipped: 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
-      delivered: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
-      cancelled: 'bg-red-500/20 text-red-300 border border-red-500/40',
-    }
-    return map[s] || 'bg-gray-500/20 text-gray-300'
-  }
+  const counts: Record<string, number> = { all: orders.length }
+  STATUS_OPTIONS.forEach(s => { counts[s] = orders.filter(o => o.order_status === s).length })
 
-  const paymentLabel = (m: string) => {
-    const map: Record<string, string> = { khalti: '💜 Khalti', esewa: '💚 eSewa', cod: '💵 COD', bank: '🏦 Bank' }
-    return map[m] || m
-  }
-
-  const counts: Record<string, number> = ['all', ...STATUS_OPTIONS].reduce((acc: Record<string, number>, s) => {
-    acc[s] = s === 'all' ? orders.length : orders.filter((o: any) => o.order_status === s).length
-    return acc
-  }, {})
-
-  const filtered = orders.filter((o: any) => {
+  const filtered = orders.filter(o => {
     const matchesFilter = filter === 'all' || o.order_status === filter
     const matchesSearch = !search ||
       o.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -127,158 +79,175 @@ export default function AdminOrders() {
     return matchesFilter && matchesSearch
   })
 
+  const totalRevenue = orders.filter(o => o.order_status !== 'cancelled').reduce((sum, o) => sum + (o.total_amount || 0), 0)
+  const pendingCount = counts.pending + counts.processing
+
   return (
-    <main className="text-white">
-      <div className="p-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-extrabold text-white">Orders</h1>
-              <p className="text-gray-400 mt-1">{orders.length} total orders</p>
-            </div>
-            <input
-              type="text"
-              placeholder="Search by name, phone, ID..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 w-64"
-            />
-          </div>
+    <div>
+      {/* Header */}
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Orders</h1>
+          <p className="admin-page-subtitle">
+            {orders.length} total · {pendingCount} pending/processing · Rs. {totalRevenue.toLocaleString()} revenue
+          </p>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input className="admin-search" placeholder="Search name, phone, ID..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: 280 }} />
+        </div>
+      </div>
 
-          {/* FILTER TABS */}
-          <div className="flex gap-2 flex-wrap mb-6">
-            {['all', ...STATUS_OPTIONS].map(s => (
-              <button key={s} onClick={() => setFilter(s)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition ${
-                  filter === s ? 'bg-white text-gray-900' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-                }`}>
-                {s} ({counts[s] || 0})
-              </button>
-            ))}
-          </div>
+      {/* Filter Tabs */}
+      <div className="admin-filter-tabs">
+        {['all', ...STATUS_OPTIONS].map(s => (
+          <button key={s} className={`admin-filter-tab ${filter === s ? 'active' : ''}`} onClick={() => setFilter(s)}>
+            {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+            <span style={{
+              marginLeft: 6, padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 600, fontFamily: 'var(--admin-font-mono)',
+              background: filter === s ? 'rgba(255,255,255,0.15)' : 'var(--admin-surface-3)',
+              color: filter === s ? 'white' : 'var(--admin-text-muted)',
+            }}>{counts[s] || 0}</span>
+          </button>
+        ))}
+      </div>
 
-          {/* ORDERS */}
-          {loading ? (
-            <div className="text-center py-20 text-gray-400">⏳ Loading orders...</div>
-          ) : filtered.length === 0 ? (
-            <div className="bg-gray-900 rounded-2xl p-16 text-center border border-gray-800">
-              <div className="text-5xl mb-3">📭</div>
-              <p className="text-gray-400">No orders found</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filtered.map((order: any) => (
-                <div key={order.id} className={`bg-gray-900 border rounded-2xl overflow-hidden transition ${
-                  order.order_status === 'cancelled' ? 'border-red-500/30 opacity-75' : 'border-gray-800'
-                }`}>
-                  {/* Header */}
-                  <div className="px-6 py-4 border-b border-gray-800 flex flex-wrap gap-4 justify-between items-start">
-                    <div className="flex flex-wrap gap-6">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">ORDER ID</p>
-                        <p className="font-mono font-bold text-white text-sm">{order.id.slice(0, 8).toUpperCase()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">CUSTOMER</p>
-                        <p className="font-bold text-white">{order.customer_name}</p>
-                        <p className="text-xs text-blue-400">{order.customer_phone}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">ADDRESS</p>
-                        <p className="text-sm text-gray-300">{order.customer_address}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">DATE</p>
-                        <p className="text-sm text-gray-300">
-                          {new Date(order.created_at).toLocaleDateString('en-NP', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">PAYMENT</p>
-                        <p className="text-sm text-gray-300">{paymentLabel(order.payment_method)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500 mb-1">TOTAL</p>
-                      <p className="text-2xl font-extrabold text-red-400">Rs. {order.total_amount?.toLocaleString()}</p>
+      {/* Orders List */}
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading orders...</div>
+      ) : filtered.length === 0 ? (
+        <div className="admin-empty">
+          <div className="admin-empty-icon">📭</div>
+          <h3>No orders found</h3>
+          <p>{search || filter !== 'all' ? 'Try adjusting your filters' : 'No orders yet'}</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map(order => {
+            const isExpanded = expandedId === order.id
+            const sc = STATUS_COLORS[order.order_status] || STATUS_COLORS.pending
+            return (
+              <div key={order.id} style={{
+                background: 'var(--admin-surface)', border: '1px solid', borderRadius: 12, overflow: 'hidden',
+                borderColor: order.order_status === 'cancelled' ? 'rgba(239,68,68,0.25)' : 'var(--admin-border)',
+                opacity: order.order_status === 'cancelled' ? 0.7 : 1, transition: 'all 0.2s',
+              }}>
+                {/* Summary Row */}
+                <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', flexWrap: 'wrap' }}
+                  onClick={() => setExpandedId(isExpanded ? null : order.id)}>
+
+                  {/* Order ID + Date */}
+                  <div style={{ minWidth: 120 }}>
+                    <div style={{ font: '600 13px var(--admin-font-mono)', color: 'var(--admin-text)' }}>#{order.id.slice(0, 8).toUpperCase()}</div>
+                    <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', marginTop: 2 }}>
+                      {npFullDate(order.created_at)}
                     </div>
                   </div>
 
-                  {/* Items */}
-                  <div className="px-6 py-3 border-b border-gray-800/50 bg-gray-800/20">
-                    {order.order_items?.map((item: any) => (
-                      <div key={item.id} className="flex justify-between text-sm py-1.5">
-                        <span className="text-gray-300">
-                          {item.product_name}
-                          <span className="text-gray-500 ml-2">× {item.quantity} | Size: {item.size}</span>
-                        </span>
-                        <span className="font-semibold text-white">Rs. {(item.price * item.quantity)?.toLocaleString()}</span>
-                      </div>
-                    ))}
-                    {order.coupon_code && (
-                      <div className="flex justify-between text-sm py-1.5 border-t border-gray-700 mt-1 pt-2">
-                        <span className="text-emerald-400 font-semibold">🏷️ Coupon: {order.coupon_code}</span>
-                        <span className="text-emerald-400 font-bold">- Rs. {(order.discount_amount || 0).toLocaleString()}</span>
-                      </div>
-                    )}
+                  {/* Customer */}
+                  <div style={{ minWidth: 140 }}>
+                    <div style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{order.customer_name}</div>
+                    <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{order.customer_phone}</div>
                   </div>
 
-                  {/* Controls */}
-                  <div className="px-6 py-4 flex flex-wrap gap-4 items-center justify-between">
-                    <div className="flex flex-wrap gap-4 items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Order:</span>
-                        <select
+                  {/* Items Count */}
+                  <div style={{ minWidth: 80 }}>
+                    <div style={{ font: '500 13px var(--admin-font-mono)', color: 'var(--admin-text-soft)' }}>
+                      {order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+
+                  {/* Payment */}
+                  <div style={{ minWidth: 80 }}>
+                    <span style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-soft)' }}>
+                      {PAYMENT_ICONS[order.payment_method] || ''} {order.payment_method?.toUpperCase() || 'COD'}
+                    </span>
+                  </div>
+
+                  {/* Status Badge */}
+                  <span style={{
+                    padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, textTransform: 'capitalize',
+                    background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`,
+                  }}>{order.order_status}</span>
+
+                  {/* Total */}
+                  <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                    <div style={{ font: '700 16px var(--admin-font-mono)', color: 'var(--admin-accent)' }}>Rs. {order.total_amount?.toLocaleString()}</div>
+                  </div>
+
+                  {/* Expand Arrow */}
+                  <svg style={{ width: 16, height: 16, color: 'var(--admin-text-muted)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+
+                {/* Expanded Detail */}
+                {isExpanded && (
+                  <div style={{ borderTop: '1px solid var(--admin-border)', padding: 20, background: 'var(--admin-bg)' }}>
+                    {/* Items */}
+                    <div style={{ marginBottom: 16 }}>
+                      <h4 style={{ font: '600 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Order Items</h4>
+                      {order.order_items?.map((item: any) => (
+                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--admin-border)' }}>
+                          <span style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text)' }}>
+                            {item.product_name} <span style={{ color: 'var(--admin-text-muted)' }}>× {item.quantity} · {item.size}</span>
+                          </span>
+                          <span style={{ font: '500 13px var(--admin-font-mono)', color: 'var(--admin-text)' }}>Rs. {(item.price * item.quantity)?.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {order.coupon_code && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', color: 'var(--admin-green)' }}>
+                          <span style={{ font: '500 13px var(--admin-font-ui)' }}>🏷️ {order.coupon_code}</span>
+                          <span style={{ font: '600 13px var(--admin-font-mono)' }}>- Rs. {(order.discount_amount || 0).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Address */}
+                    <div style={{ marginBottom: 16 }}>
+                      <h4 style={{ font: '600 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>Delivery Address</h4>
+                      <p style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text)', margin: 0 }}>{order.customer_address}</p>
+                    </div>
+
+                    {/* Controls */}
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ font: '500 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Order:</span>
+                        <select className="admin-input" style={{ padding: '5px 10px', fontSize: 12, width: 'auto' }}
                           value={order.order_status}
                           onChange={e => updateStatus(order.id, e.target.value)}
-                          disabled={updating === order.id || order.order_status === 'cancelled'}
-                          className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-white capitalize focus:outline-none focus:border-blue-500 disabled:opacity-50">
-                          {STATUS_OPTIONS.map(s => (
-                            <option key={s} value={s} className="bg-gray-800 capitalize">{s}</option>
-                          ))}
+                          disabled={updating === order.id || order.order_status === 'cancelled'}>
+                          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
                         </select>
-                        {updating === order.id && <span className="text-xs text-gray-500 animate-pulse">Saving...</span>}
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Payment:</span>
-                        <select
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ font: '500 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Payment:</span>
+                        <select className="admin-input" style={{ padding: '5px 10px', fontSize: 12, width: 'auto' }}
                           value={order.payment_status || 'pending'}
                           onChange={e => updatePayment(order.id, e.target.value)}
-                          disabled={order.order_status === 'cancelled'}
-                          className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:border-blue-500 disabled:opacity-50">
-                          <option value="pending" className="bg-gray-800">⏳ Pending</option>
-                          <option value="paid" className="bg-gray-800">✅ Paid</option>
-                          <option value="failed" className="bg-gray-800">❌ Failed</option>
-                          <option value="cancelled" className="bg-gray-800">🚫 Cancelled</option>
+                          disabled={order.order_status === 'cancelled'}>
+                          <option value="pending">Pending</option>
+                          <option value="paid">Paid</option>
+                          <option value="failed">Failed</option>
+                          <option value="cancelled">Cancelled</option>
                         </select>
                       </div>
-
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold capitalize ${statusBadge(order.order_status)}`}>
-                        {order.order_status}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {order.order_status !== 'cancelled' && order.order_status !== 'delivered' && (
-                        <button
-                          onClick={() => cancelOrder(order.id)}
-                          disabled={cancellingId === order.id}
-                          className="bg-red-600/20 text-red-300 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-600/40 transition disabled:opacity-50">
-                          🚫 Cancel
-                        </button>
-                      )}
-                      <button
-                        onClick={() => deleteOrder(order.id)}
-                        className="bg-gray-700/50 text-gray-400 border border-gray-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-900/40 hover:text-red-300 transition">
-                        🗑️ Delete
-                      </button>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                        {order.order_status !== 'cancelled' && order.order_status !== 'delivered' && (
+                          <button className="btn-admin-ghost" style={{ color: 'var(--admin-red)', fontSize: 12, padding: '5px 12px' }} onClick={() => cancelOrder(order.id)}>Cancel Order</button>
+                        )}
+                        <button className="btn-admin-ghost" style={{ color: 'var(--admin-red)', fontSize: 12, padding: '5px 12px' }} onClick={() => deleteOrder(order.id)}>Delete</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                )}
+              </div>
+            )
+          })}
         </div>
-    </main>
+      )}
+    </div>
   )
 }

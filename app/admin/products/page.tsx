@@ -2,10 +2,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
-const CATEGORIES = ["Men's Wear", "Women's Wear", "Kids' Wear"]
-const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', '2-3Y', '4-5Y', '6-7Y', '8-9Y']
+const CATEGORIES = ["All", "Men's Wear", "Women's Wear", "Kids' Wear"]
+const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size', '2-3Y', '4-5Y', '6-7Y', '8-9Y', '0-1Y', '1-2Y', '2-3Y', '0-3M', '3-6M', '6-12M', '5-6Y', '7-8Y', '9-10Y', '10-11Y', '11-12Y', '12-13Y']
+const PER_PAGE = 20
 
 export default function AdminProducts() {
   const router = useRouter()
@@ -15,13 +15,19 @@ export default function AdminProducts() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [editId, setEditId] = useState(null)
+  const [editId, setEditId] = useState<string | null>(null)
   const [message, setMessage] = useState({ text: '', type: '' })
-  const [previewImages, setPreviewImages] = useState([])
+  const [previewImages, setPreviewImages] = useState<string[]>([])
   const [form, setForm] = useState({
-    name: '', description: '', price: '', category: "Men's Wear",
-    sizes: [], stock: '', image_urls: []
+    name: '', description: '', price: '', sale_price: '', category: "Men's Wear",
+    sizes: [] as string[], stock: '', image_urls: [] as string[]
   })
+
+  // Filters & Search
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('All')
+  const [sortBy, setSortBy] = useState('newest')
+  const [page, setPage] = useState(1)
 
   useEffect(() => { checkAdmin() }, [])
 
@@ -39,7 +45,23 @@ export default function AdminProducts() {
     setLoading(false)
   }
 
-  const toggleSize = (size) => {
+  // Filtered products
+  const filtered = products.filter(p => {
+    if (category !== 'All' && p.category !== category) return false
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.description?.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  }).sort((a, b) => {
+    if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (sortBy === 'price-high') return b.price - a.price
+    if (sortBy === 'price-low') return a.price - b.price
+    if (sortBy === 'name') return a.name.localeCompare(b.name)
+    return 0
+  })
+
+  const totalPages = Math.ceil(filtered.length / PER_PAGE)
+  const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+
+  const toggleSize = (size: string) => {
     setForm(f => ({
       ...f,
       sizes: f.sizes.includes(size) ? f.sizes.filter(s => s !== size) : [...f.sizes, size]
@@ -47,324 +69,315 @@ export default function AdminProducts() {
   }
 
   const resetForm = () => {
-    setForm({ name: '', description: '', price: '', category: "Men's Wear", sizes: [], stock: '', image_urls: [] })
+    setForm({ name: '', description: '', price: '', sale_price: '', category: "Men's Wear", sizes: [], stock: '', image_urls: [] })
     setPreviewImages([])
     setEditId(null)
-    setShowForm(false)
-    setMessage({ text: '', type: '' })
   }
 
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files)
-    if (files.length === 0) return
-    if (files.length > 5) {
-      setMessage({ text: '❌ Maximum 5 images allowed per product', type: 'error' })
-      return
-    }
-
+  const handleImageUpload = async (e: any) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
     setUploading(true)
-    setMessage({ text: '⏳ Uploading images...', type: 'info' })
-
-    const uploadedUrls = []
-    const previews = []
-
+    const urls: string[] = []
     for (const file of files) {
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = (ev) => previews.push(ev.target.result)
-      reader.readAsDataURL(file)
-
-      // Upload to Supabase Storage
-      const fileName = `products/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name.replace(/\s/g, '_')}`
-      const { data, error } = await supabase.storage.from('product-images').upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      })
-
-      if (error) {
-        setMessage({ text: `❌ Upload failed: ${error.message}`, type: 'error' })
-        setUploading(false)
-        return
+      const ext = (file as File).name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data } = await supabase.storage.from('product-images').upload(fileName, file as File)
+      if (data) {
+        const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(data.path)
+        if (urlData?.publicUrl) urls.push(urlData.publicUrl)
       }
-
-      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName)
-      uploadedUrls.push(urlData.publicUrl)
     }
-
-    setTimeout(() => {
-      setPreviewImages(prev => [...prev, ...previews])
-    }, 500)
-
-    setForm(f => ({ ...f, image_urls: [...(f.image_urls || []), ...uploadedUrls] }))
-    setMessage({ text: `✅ ${files.length} image(s) uploaded successfully!`, type: 'success' })
+    setForm(f => ({ ...f, image_urls: [...f.image_urls, ...urls] }))
+    setPreviewImages(prev => [...prev, ...urls])
     setUploading(false)
   }
 
-  const removeImage = (index) => {
+  const removeImage = (index: number) => {
     setForm(f => ({ ...f, image_urls: f.image_urls.filter((_, i) => i !== index) }))
     setPreviewImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleEdit = (product) => {
-    setForm({
-      name: product.name,
-      description: product.description || '',
-      price: product.price,
-      category: product.category,
-      sizes: product.sizes || [],
-      stock: product.stock,
-      image_urls: product.image_urls || (product.image_url ? [product.image_url] : [])
-    })
-    setPreviewImages(product.image_urls || (product.image_url ? [product.image_url] : []))
-    setEditId(product.id)
-    setShowForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
-    await supabase.from('products').delete().eq('id', id)
-    setProducts(products.filter(p => p.id !== id))
-    setMessage({ text: '✅ Product deleted.', type: 'success' })
-  }
-
-  const handleSave = async () => {
-    if (!form.name || !form.price || !form.category) {
-      setMessage({ text: '❌ Name, Price and Category are required.', type: 'error' })
-      return
-    }
+  const handleSubmit = async () => {
+    if (!form.name || !form.price) { setMessage({ text: 'Name and price are required', type: 'error' }); return }
     setSaving(true)
-    setMessage({ text: '', type: '' })
-
-    const imageUrls = form.image_urls || []
-    const productData = {
+    const payload = {
       name: form.name.trim(),
       description: form.description.trim(),
-      price: parseInt(form.price),
+      price: parseInt(form.price) || 0,
+      sale_price: form.sale_price ? parseInt(form.sale_price) : null,
       category: form.category,
       sizes: form.sizes,
       stock: parseInt(form.stock) || 0,
-      image_url: imageUrls[0] || null,
-      image_urls: imageUrls
+      image_url: form.image_urls[0] || null,
+      image_urls: form.image_urls,
     }
-
     if (editId) {
-      const { error } = await supabase.from('products').update(productData).eq('id', editId)
-      if (error) setMessage({ text: '❌ Error: ' + error.message, type: 'error' })
-      else { setMessage({ text: '✅ Product updated!', type: 'success' }); fetchProducts() }
+      const { error } = await supabase.from('products').update(payload).eq('id', editId)
+      if (error) setMessage({ text: error.message, type: 'error' })
+      else { setMessage({ text: 'Product updated!', type: 'success' }); setShowForm(false); resetForm() }
     } else {
-      const { error } = await supabase.from('products').insert(productData)
-      if (error) setMessage({ text: '❌ Error: ' + error.message, type: 'error' })
-      else { setMessage({ text: '✅ Product added!', type: 'success' }); fetchProducts(); resetForm(); setShowForm(false) }
+      const { error } = await supabase.from('products').insert({ ...payload, id: crypto.randomUUID() })
+      if (error) setMessage({ text: error.message, type: 'error' })
+      else { setMessage({ text: 'Product created!', type: 'success' }); setShowForm(false); resetForm() }
     }
     setSaving(false)
+    fetchProducts()
+    setTimeout(() => setMessage({ text: '', type: '' }), 3000)
   }
 
+  const handleEdit = (product: any) => {
+    setForm({
+      name: product.name, description: product.description || '',
+      price: String(product.price), sale_price: product.sale_price ? String(product.sale_price) : '',
+      category: product.category, sizes: product.sizes || [],
+      stock: String(product.stock), image_urls: product.image_urls || [product.image_url].filter(Boolean)
+    })
+    setPreviewImages(product.image_urls || [product.image_url].filter(Boolean))
+    setEditId(product.id)
+    setShowForm(true)
+  }
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    await supabase.from('products').delete().eq('id', id)
+    setMessage({ text: 'Product deleted', type: 'success' })
+    fetchProducts()
+    setTimeout(() => setMessage({ text: '', type: '' }), 3000)
+  }
+
+  const lowStock = products.filter(p => p.stock < 5).length
+
   return (
-    <main className="text-white">
-      <div className="p-8">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-extrabold text-white">Products</h1>
-              <p className="text-gray-400 mt-1">{products.length} products in your store</p>
+    <div>
+      {/* Header */}
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Products</h1>
+          <p className="admin-page-subtitle">{products.length} products · {lowStock} low stock</p>
+        </div>
+        <button className="btn-admin-primary" onClick={() => { resetForm(); setShowForm(true) }}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          Add Product
+        </button>
+      </div>
+
+      {/* Toast */}
+      {message.text && (
+        <div className="admin-toast" style={{ background: message.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: message.type === 'error' ? 'var(--admin-red)' : 'var(--admin-green)', border: `1px solid ${message.type === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}` }}>
+          {message.text}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '0 0 280px' }}>
+          <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input className="admin-search" placeholder="Search products..." value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} style={{ width: '100%' }} />
+        </div>
+        <select className="admin-input" style={{ width: 160, padding: '9px 12px' }} value={category} onChange={e => { setCategory(e.target.value); setPage(1) }}>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select className="admin-input" style={{ width: 160, padding: '9px 12px' }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+          <option value="newest">Newest First</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="name">Name A-Z</option>
+        </select>
+      </div>
+
+      {/* Product Form Modal */}
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => { setShowForm(false); resetForm() }}>
+          <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '85vh', overflow: 'auto', padding: 32 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ font: '600 20px var(--admin-font-ui)', color: 'var(--admin-text)', margin: 0 }}>{editId ? 'Edit Product' : 'Add New Product'}</h2>
+              <button onClick={() => { setShowForm(false); resetForm() }} style={{ background: 'none', border: 'none', color: 'var(--admin-text-muted)', cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
-            <button onClick={() => { resetForm(); setShowForm(true) }}
-              className="bg-blue-600 hover:bg-blue-500 px-5 py-3 rounded-xl font-bold transition flex items-center gap-2">
-              ➕ Add New Product
-            </button>
-          </div>
 
-          {/* ADD/EDIT FORM */}
-          {showForm && (
-            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 mb-8">
-              <h2 className="text-xl font-bold text-white mb-5">
-                {editId ? '✏️ Edit Product' : '➕ Add New Product'}
-              </h2>
-
-              {message.text && (
-                <div className={`px-4 py-3 rounded-xl mb-5 text-sm font-semibold ${
-                  message.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                  message.type === 'error' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
-                  'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                }`}>{message.text}</div>
-              )}
-
-              <div className="grid md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Product Name *</label>
-                  <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
-                    placeholder="e.g. Daura Suruwal"
-                    className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Price (Rs.) *</label>
-                  <input type="number" value={form.price} onChange={e => setForm({...form, price: e.target.value})}
-                    placeholder="e.g. 1500"
-                    className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Category *</label>
-                  <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500">
-                    {CATEGORIES.map(c => <option key={c} className="bg-gray-800">{c}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Stock Quantity</label>
-                  <input type="number" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})}
-                    placeholder="e.g. 20"
-                    className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Description</label>
-                  <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})}
-                    placeholder="Describe this product..." rows={3}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none" />
-                </div>
-
-                {/* IMAGE UPLOAD */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Product Images (up to 5 photos)
-                  </label>
-
-                  {/* Upload Button */}
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-gray-600 hover:border-blue-500 rounded-xl p-8 text-center cursor-pointer transition group">
-                    <div className="text-4xl mb-2">📸</div>
-                    <p className="text-gray-300 font-semibold group-hover:text-blue-400 transition">
-                      {uploading ? 'Uploading...' : 'Click to upload photos'}
-                    </p>
-                    <p className="text-gray-500 text-sm mt-1">JPG, PNG, WEBP — Max 5 images</p>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
-                  </div>
-
-                  {/* Image Previews */}
-                  {form.image_urls && form.image_urls.length > 0 && (
-                    <div className="flex gap-3 mt-4 flex-wrap">
-                      {form.image_urls.map((url, i) => (
-                        <div key={i} className="relative group">
-                          <img src={url} alt={`Product ${i+1}`}
-                            className="w-24 h-24 object-cover rounded-xl border border-gray-600" />
-                          {i === 0 && (
-                            <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-                              Main
-                            </span>
-                          )}
-                          <button onClick={() => removeImage(i)}
-                            className="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* SIZES */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Available Sizes</label>
-                  <div className="flex flex-wrap gap-2">
-                    {ALL_SIZES.map(size => (
-                      <button key={size} type="button" onClick={() => toggleSize(size)}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transition border ${
-                          form.sizes.includes(size)
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-blue-500'
-                        }`}>
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="admin-label">Product Name *</label>
+                <input className="admin-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Classic Cotton T-Shirt" />
               </div>
-
-              <div className="flex gap-3 mt-6">
-                <button onClick={handleSave} disabled={saving || uploading}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition disabled:opacity-50">
-                  {saving ? 'Saving...' : editId ? '✅ Update Product' : '➕ Add Product'}
-                </button>
-                <button onClick={resetForm}
-                  className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-6 py-3 rounded-xl font-bold transition">
-                  Cancel
-                </button>
+              <div>
+                <label className="admin-label">Category *</label>
+                <select className="admin-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                  {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="admin-label">Stock</label>
+                <input className="admin-input" type="number" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} placeholder="0" />
+              </div>
+              <div>
+                <label className="admin-label">Price (Rs.) *</label>
+                <input className="admin-input" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="999" />
+              </div>
+              <div>
+                <label className="admin-label">Sale Price (Rs.)</label>
+                <input className="admin-input" type="number" value={form.sale_price} onChange={e => setForm(f => ({ ...f, sale_price: e.target.value }))} placeholder="Optional" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className="admin-label">Description</label>
+                <textarea className="admin-input" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Product description..." style={{ resize: 'vertical' }} />
               </div>
             </div>
-          )}
 
-          {/* PRODUCTS LIST */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800">
-              <h2 className="text-lg font-bold text-white">All Products ({products.length})</h2>
-            </div>
-            {loading ? (
-              <div className="text-center py-16 text-gray-400">⏳ Loading...</div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="text-5xl mb-3">👔</div>
-                <p className="text-gray-400">No products yet. Add your first one!</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {products.map(product => (
-                  <div key={product.id} className="flex items-center gap-4 p-5 hover:bg-gray-800/40 transition">
-                    {/* Image */}
-                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-800 flex-shrink-0 flex items-center justify-center text-3xl">
-                      {product.image_url || (product.image_urls && product.image_urls[0])
-                        ? <img src={product.image_url || product.image_urls[0]} alt={product.name} className="w-full h-full object-cover" />
-                        : product.category === "Men's Wear" ? '👔' : product.category === "Women's Wear" ? '👗' : '🧒'}
-                    </div>
-
-                    {/* Multiple image count */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold text-white truncate">{product.name}</h3>
-                        {product.image_urls && product.image_urls.length > 1 && (
-                          <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded-full border border-blue-500/30">
-                            {product.image_urls.length} photos
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-400">{product.category} • Stock: {product.stock}</p>
-                      <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {product.sizes?.map(s => (
-                          <span key={s} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">{s}</span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="text-right mr-4">
-                      <p className="text-xl font-extrabold text-red-400">Rs. {product.price?.toLocaleString()}</p>
-                    </div>
-
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button onClick={() => handleEdit(product)}
-                        className="bg-blue-600/20 text-blue-300 border border-blue-500/30 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-blue-600/40 transition">
-                        ✏️ Edit
-                      </button>
-                      <button onClick={() => handleDelete(product.id, product.name)}
-                        className="bg-red-600/20 text-red-300 border border-red-500/30 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-red-600/40 transition">
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
+            {/* Sizes */}
+            <div style={{ marginBottom: 16 }}>
+              <label className="admin-label">Sizes</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ALL_SIZES.map(size => (
+                  <button key={size} onClick={() => toggleSize(size)} style={{
+                    padding: '5px 12px', borderRadius: 6, border: '1px solid',
+                    borderColor: form.sizes.includes(size) ? 'var(--admin-accent)' : 'var(--admin-border)',
+                    background: form.sizes.includes(size) ? 'var(--admin-accent-dim)' : 'transparent',
+                    color: form.sizes.includes(size) ? 'var(--admin-accent)' : 'var(--admin-text-soft)',
+                    font: '500 12px var(--admin-font-ui)', cursor: 'pointer', transition: 'all 0.15s',
+                  }}>{size}</button>
                 ))}
               </div>
-            )}
+            </div>
+
+            {/* Images */}
+            <div style={{ marginBottom: 24 }}>
+              <label className="admin-label">Product Images</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {previewImages.map((url, i) => (
+                  <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--admin-border)' }}>
+                    <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                    <button onClick={() => removeImage(i)} style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                  </div>
+                ))}
+                <label style={{
+                  width: 80, height: 80, borderRadius: 8, border: '2px dashed var(--admin-border)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--admin-text-muted)', fontSize: 11, gap: 2,
+                  transition: 'border-color 0.2s',
+                }}>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  {uploading ? '...' : 'Add'}
+                  <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button className="btn-admin-ghost" onClick={() => { setShowForm(false); resetForm() }}>Cancel</button>
+              <button className="btn-admin-primary" onClick={handleSubmit} disabled={saving}>
+                {saving ? 'Saving...' : editId ? 'Update Product' : 'Create Product'}
+              </button>
+            </div>
           </div>
         </div>
-    </main>
+      )}
+
+      {/* Products Table */}
+      <div className="admin-table-container">
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--admin-text-muted)' }}>Loading products...</div>
+        ) : paged.length === 0 ? (
+          <div className="admin-empty">
+            <div className="admin-empty-icon">📦</div>
+            <h3>No products found</h3>
+            <p>{search || category !== 'All' ? 'Try adjusting your filters' : 'Add your first product to get started'}</p>
+          </div>
+        ) : (
+          <>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 50 }}></th>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th style={{ width: 100 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((product) => (
+                  <tr key={product.id}>
+                    <td>
+                      <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: 'var(--admin-surface-2)' }}>
+                        {product.image_url ? (
+                          <img src={product.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-muted)', fontSize: 18 }}>📦</div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ font: '500 14px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{product.name}</div>
+                      <div style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', marginTop: 2 }}>
+                        {product.sizes?.slice(0, 3).join(', ')}{product.sizes?.length > 3 ? ` +${product.sizes.length - 3}` : ''}
+                      </div>
+                    </td>
+                    <td style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text-soft)' }}>{product.category}</td>
+                    <td>
+                      {product.sale_price ? (
+                        <div>
+                          <span style={{ font: '600 13px var(--admin-font-mono)', color: 'var(--admin-accent)' }}>Rs. {product.sale_price.toLocaleString()}</span>
+                          <span style={{ font: '400 12px var(--admin-font-mono)', color: 'var(--admin-text-muted)', textDecoration: 'line-through', marginLeft: 6 }}>Rs. {product.price.toLocaleString()}</span>
+                        </div>
+                      ) : (
+                        <span style={{ font: '600 13px var(--admin-font-mono)', color: 'var(--admin-text)' }}>Rs. {product.price.toLocaleString()}</span>
+                      )}
+                    </td>
+                    <td>
+                      <span style={{
+                        font: '500 13px var(--admin-font-mono)',
+                        color: product.stock === 0 ? 'var(--admin-red)' : product.stock < 5 ? 'var(--admin-yellow)' : 'var(--admin-text)',
+                      }}>{product.stock}</span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => handleEdit(product)} style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--admin-border)', background: 'transparent', color: 'var(--admin-text-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--admin-accent)'; e.currentTarget.style.color = 'var(--admin-accent)' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--admin-border)'; e.currentTarget.style.color = 'var(--admin-text-soft)' }}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                        <button onClick={() => handleDelete(product.id, product.name)} style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--admin-border)', background: 'transparent', color: 'var(--admin-text-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--admin-red)'; e.currentTarget.style.color = 'var(--admin-red)' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--admin-border)'; e.currentTarget.style.color = 'var(--admin-text-soft)' }}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--admin-border)' }}>
+                <span style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>
+                  Showing {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)} of {filtered.length}
+                </span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="btn-admin-ghost" style={{ padding: '5px 12px', fontSize: 13 }} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const p = i + 1
+                    return <button key={p} onClick={() => setPage(p)} style={{
+                      width: 32, height: 32, borderRadius: 6, border: 'none', cursor: 'pointer',
+                      font: '500 13px var(--admin-font-mono)',
+                      background: page === p ? 'var(--admin-accent)' : 'transparent',
+                      color: page === p ? 'white' : 'var(--admin-text-muted)',
+                    }}>{p}</button>
+                  })}
+                  <button className="btn-admin-ghost" style={{ padding: '5px 12px', fontSize: 13 }} onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   )
 }

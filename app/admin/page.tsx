@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { npShortDate, npFullDate } from '../../lib/timezone'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
+  const [chartRange, setChartRange] = useState('30')
 
   useEffect(() => { checkAdmin() }, [])
 
@@ -40,133 +42,171 @@ export default function AdminDashboard() {
     setLoading(false)
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
-      pending: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
-      processing: 'bg-blue-500/20 text-blue-300 border border-blue-500/40',
-      shipped: 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
-      delivered: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
-      cancelled: 'bg-red-500/20 text-red-300 border border-red-500/40',
+      pending: 'badge-admin badge-admin-pending',
+      processing: 'badge-admin badge-admin-processing',
+      shipped: 'badge-admin badge-admin-shipped',
+      delivered: 'badge-admin badge-admin-delivered',
+      cancelled: 'badge-admin badge-admin-cancelled',
     }
-    return map[s] || 'bg-gray-500/20 text-gray-300'
+    return map[s] || 'badge-admin badge-admin-inactive'
   }
 
-  const paymentLabel = (m: string) => {
-    const map: Record<string, string> = { khalti: '💜 Khalti', esewa: '💚 eSewa', cod: '💵 COD', bank: '🏦 Bank' }
+  const paymentIcon = (m: string) => {
+    const map: Record<string, string> = { khalti: 'K', esewa: 'eS', cod: 'COD', bank: 'B' }
     return map[m] || m
   }
 
+  const actionIcon = (a: string) => {
+    const map: Record<string, { color: string; icon: string }> = {
+      purchase: { color: 'var(--admin-green)', icon: '$' },
+      signup: { color: 'var(--admin-blue)', icon: '+' },
+      login: { color: 'var(--admin-purple)', icon: '>' },
+      page_view: { color: 'var(--admin-text-muted)', icon: '/' },
+      add_to_cart: { color: 'var(--admin-yellow)', icon: 'C' },
+      product_view: { color: 'var(--admin-text-soft)', icon: 'P' },
+      checkout: { color: 'var(--admin-accent)', icon: '#' },
+    }
+    return map[a] || { color: 'var(--admin-text-muted)', icon: '.' }
+  }
+
   const maxRevenue = Math.max(...chartData.map(d => d.revenue), 1)
+  const totalStatusOrders = Object.values(statusBreakdown).reduce((a, b) => a + b, 0)
 
   if (!authorized) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-gray-400 text-sm">Verifying access...</p>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 40, height: 40, border: '3px solid var(--admin-accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+        <p style={{ color: 'var(--admin-text-soft)', fontSize: 14 }}>Verifying access...</p>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 
   return (
-    <div className="p-6 lg:p-8 text-white">
-      <div className="flex justify-between items-center mb-8">
+    <div>
+      {/* Header */}
+      <div className="admin-page-header">
         <div>
-          <h1 className="text-3xl font-extrabold">Dashboard</h1>
-          <p className="text-gray-400 mt-1">Your store overview at a glance</p>
+          <h1 className="admin-page-title">Dashboard</h1>
+          <p className="admin-page-subtitle">Your store overview at a glance</p>
         </div>
-        <button onClick={handleLogout} className="text-red-400 hover:text-red-300 text-sm font-semibold transition">
-          🚪 Logout
-        </button>
       </div>
 
-      {/* STAT CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
-          { label: 'Total Revenue', value: `Rs. ${stats.totalRevenue.toLocaleString()}`, icon: '💰', color: 'from-red-700 to-rose-800' },
-          { label: 'Total Orders', value: stats.totalOrders, icon: '📦', color: 'from-blue-700 to-blue-800' },
-          { label: 'Products', value: stats.totalProducts, icon: '👔', color: 'from-violet-700 to-violet-800' },
-          { label: 'Pending', value: stats.pendingOrders, icon: '⏳', color: 'from-amber-600 to-amber-700' },
-          { label: 'Delivered', value: stats.deliveredOrders, icon: '✅', color: 'from-emerald-700 to-emerald-800' },
-          { label: 'Cancelled', value: stats.cancelledOrders, icon: '🚫', color: 'from-gray-600 to-gray-700' },
-          { label: 'Low Stock', value: stats.lowStockProducts, icon: '⚠️', color: 'from-orange-600 to-orange-700' },
-          { label: 'Out of Stock', value: stats.outOfStock, icon: '❌', color: 'from-red-800 to-red-900' },
-        ].map(s => (
-          <div key={s.label} className={`bg-gradient-to-br ${s.color} rounded-2xl p-4 sm:p-5 ${loading ? 'animate-pulse' : ''}`}>
-            <div className="text-2xl mb-2">{s.icon}</div>
-            <p className="text-xl sm:text-2xl font-extrabold">{loading ? '—' : s.value}</p>
-            <p className="text-white/60 text-xs sm:text-sm mt-1">{s.label}</p>
+          { label: 'Total Revenue', value: `Rs. ${stats.totalRevenue.toLocaleString()}`, accent: 'var(--admin-green)', sub: 'Lifetime earnings' },
+          { label: 'Total Orders', value: stats.totalOrders, accent: 'var(--admin-blue)', sub: `${stats.pendingOrders} pending` },
+          { label: 'Products', value: stats.totalProducts, accent: 'var(--admin-purple)', sub: `${stats.lowStockProducts} low stock` },
+          { label: 'Pending Orders', value: stats.pendingOrders, accent: 'var(--admin-yellow)', sub: 'Needs action' },
+        ].map((s, i) => (
+          <div key={i} className="stat-card" style={{ '--card-accent': s.accent } as any}>
+            <div className="stat-label">{s.label}</div>
+            <div className="stat-value">{loading ? '—' : s.value}</div>
+            <div className="stat-change" style={{ color: 'var(--admin-text-muted)' }}>{s.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* REVENUE CHART */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
-        <h2 className="text-lg font-bold mb-4">📈 Revenue (Last 30 Days)</h2>
+      {/* Revenue Chart */}
+      <div className="admin-chart-container" style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ font: '600 16px var(--admin-font-ui)', color: 'var(--admin-text)', margin: 0 }}>Revenue Trend</h2>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['7', '30', '90'].map(r => (
+              <button key={r} onClick={() => setChartRange(r)}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  font: '500 12px var(--admin-font-ui)',
+                  background: chartRange === r ? 'var(--admin-accent-dim)' : 'transparent',
+                  color: chartRange === r ? 'var(--admin-accent)' : 'var(--admin-text-muted)',
+                }}>
+                {r === '7' ? '7D' : r === '30' ? '30D' : '90D'}
+              </button>
+            ))}
+          </div>
+        </div>
         {chartData.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No revenue data yet</p>
+          <div className="admin-empty"><p>No revenue data yet</p></div>
         ) : (
-          <div className="flex items-end gap-1 h-48">
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 180 }}>
             {chartData.map((d, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center group relative">
-                <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded hidden group-hover:block whitespace-nowrap z-10">
-                  {d.date}: Rs. {d.revenue.toLocaleString()}
+              <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', position: 'relative' }}
+                className="group">
+                <div style={{
+                  position: 'absolute', bottom: '100%', marginBottom: 8,
+                  background: 'var(--admin-surface-3)', color: 'var(--admin-text)',
+                  fontSize: 11, padding: '4px 8px', borderRadius: 6,
+                  whiteSpace: 'nowrap', display: 'none', zIndex: 10,
+                  font: '500 11px var(--admin-font-mono)',
+                }} className="group-hover:block">
+                  Rs. {d.revenue.toLocaleString()}
                 </div>
-                <div
-                  className="w-full bg-red-600 rounded-t-md hover:bg-red-500 transition min-h-[4px]"
-                  style={{ height: `${(d.revenue / maxRevenue) * 100}%` }}
-                />
+                <div style={{
+                  width: '100%',
+                  background: `linear-gradient(to top, var(--admin-accent), rgba(232,69,96,0.6))`,
+                  borderRadius: '3px 3px 0 0',
+                  minHeight: 4,
+                  height: `${(d.revenue / maxRevenue) * 100}%`,
+                  transition: 'background 0.2s',
+                  cursor: 'pointer',
+                }} />
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8 mb-8">
-        {/* TOP PRODUCTS */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h2 className="text-lg font-bold mb-4">🏆 Top Products</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28, marginBottom: 28 }}>
+        {/* Top Products */}
+        <div className="admin-card">
+          <h2 style={{ font: '600 16px var(--admin-font-ui)', color: 'var(--admin-text)', margin: '0 0 16px' }}>Top Products</h2>
           {topProducts.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No sales data yet</p>
+            <div className="admin-empty" style={{ padding: '30px 16px' }}><p>No sales data yet</p></div>
           ) : (
-            <div className="space-y-3">
-              {topProducts.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 bg-gray-800/50 rounded-xl p-3">
-                  <span className="text-lg font-extrabold text-gray-500 w-6">#{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{p.name}</p>
-                    <p className="text-xs text-gray-400">{p.qty} sold</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {topProducts.map((p, i) => {
+                const maxQty = Math.max(...topProducts.map(t => t.qty), 1)
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--admin-surface-2)' }}>
+                    <span style={{ font: '700 14px var(--admin-font-mono)', color: 'var(--admin-text-muted)', width: 24 }}>#{i + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ height: 4, background: 'var(--admin-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${(p.qty / maxQty) * 100}%`, background: 'var(--admin-accent)', borderRadius: 2 }} />
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ font: '600 13px var(--admin-font-mono)', color: 'var(--admin-text)' }}>Rs. {p.total.toLocaleString()}</div>
+                      <div style={{ font: '400 11px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{p.qty} sold</div>
+                    </div>
                   </div>
-                  <span className="font-bold text-red-400 text-sm">Rs. {p.total.toLocaleString()}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
 
-        {/* ORDER STATUS BREAKDOWN */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h2 className="text-lg font-bold mb-4">📊 Order Status (30 Days)</h2>
+        {/* Order Status */}
+        <div className="admin-card">
+          <h2 style={{ font: '600 16px var(--admin-font-ui)', color: 'var(--admin-text)', margin: '0 0 16px' }}>Order Status</h2>
           {Object.keys(statusBreakdown).length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No orders yet</p>
+            <div className="admin-empty" style={{ padding: '30px 16px' }}><p>No orders yet</p></div>
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {Object.entries(statusBreakdown).map(([status, count]) => {
-                const total = Object.values(statusBreakdown).reduce((a, b) => a + b, 0)
-                const pct = total > 0 ? ((count as number) / total * 100) : 0
+                const pct = totalStatusOrders > 0 ? ((count as number) / totalStatusOrders * 100) : 0
+                const colors: Record<string, string> = { pending: 'var(--admin-yellow)', processing: 'var(--admin-blue)', shipped: 'var(--admin-purple)', delivered: 'var(--admin-green)', cancelled: 'var(--admin-red)' }
                 return (
                   <div key={status}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="capitalize font-semibold">{status}</span>
-                      <span className="text-gray-400">{count} ({pct.toFixed(0)}%)</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)', textTransform: 'capitalize' }}>{status}</span>
+                      <span style={{ font: '500 12px var(--admin-font-mono)', color: 'var(--admin-text-muted)' }}>{count} ({pct.toFixed(0)}%)</span>
                     </div>
-                    <div className="w-full bg-gray-800 rounded-full h-2.5">
-                      <div className={`h-2.5 rounded-full ${status === 'pending' ? 'bg-amber-500' : status === 'processing' ? 'bg-blue-500' : status === 'shipped' ? 'bg-violet-500' : status === 'delivered' ? 'bg-emerald-500' : 'bg-red-500'}`}
-                        style={{ width: `${pct}%` }} />
+                    <div style={{ height: 6, background: 'var(--admin-surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: colors[status] || 'var(--admin-text-muted)', borderRadius: 3, transition: 'width 0.5s' }} />
                     </div>
                   </div>
                 )
@@ -176,86 +216,81 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* QUICK LINKS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[
-          { href: '/admin/products', label: 'Products', icon: '👔', color: 'bg-blue-600' },
-          { href: '/admin/orders', label: 'Orders', icon: '📦', color: 'bg-violet-600' },
-          { href: '/admin/users', label: 'Users', icon: '👥', color: 'bg-emerald-600' },
-          { href: '/admin/coupons', label: 'Coupons', icon: '🏷️', color: 'bg-amber-600' },
-          { href: '/admin/settings', label: 'Settings', icon: '⚙️', color: 'bg-gray-600' },
-          { href: '/admin/banners', label: 'Banners', icon: '🖼️', color: 'bg-pink-600' },
-          { href: '/admin/reviews', label: 'Reviews', icon: '⭐', color: 'bg-yellow-600' },
-          { href: '/admin/activity', label: 'Activity', icon: '📋', color: 'bg-cyan-600' },
-        ].map(item => (
-          <Link key={item.href} href={item.href}
-            className="bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-2xl p-4 flex items-center gap-3 transition group">
-            <div className={`w-10 h-10 ${item.color} rounded-xl flex items-center justify-center text-xl`}>{item.icon}</div>
-            <span className="font-bold text-sm group-hover:text-white transition">{item.label}</span>
-          </Link>
-        ))}
-      </div>
-
-      {/* RECENT ORDERS */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden mb-8">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-800">
-          <h2 className="text-lg font-bold">Recent Orders</h2>
-          <Link href="/admin/orders" className="text-red-400 text-sm font-semibold hover:text-red-300">View All →</Link>
+      {/* Recent Orders */}
+      <div className="admin-table-container" style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--admin-border)' }}>
+          <h2 style={{ font: '600 16px var(--admin-font-ui)', color: 'var(--admin-text)', margin: 0 }}>Recent Orders</h2>
+          <Link href="/admin/orders" style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-accent)', textDecoration: 'none' }}>View All →</Link>
         </div>
         {recentOrders.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No orders yet</div>
+          <div className="admin-empty" style={{ padding: '40px 20px' }}><p>No orders yet</p></div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-800">
-                  {['ID', 'Customer', 'Amount', 'Payment', 'Status'].map(h => (
-                    <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase">{h}</th>
-                  ))}
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Payment</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentOrders.map((order: any) => (
+                <tr key={order.id}>
+                  <td className="order-id">{order.id.slice(0, 8).toUpperCase()}</td>
+                  <td>
+                    <div style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{order.customer_name}</div>
+                    <div style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{order.customer_phone}</div>
+                  </td>
+                  <td style={{ font: '600 13px var(--admin-font-mono)', color: 'var(--admin-text)' }}>Rs. {order.total_amount?.toLocaleString()}</td>
+                  <td>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '3px 8px', borderRadius: 4,
+                      background: 'var(--admin-surface-3)',
+                      font: '500 12px var(--admin-font-mono)', color: 'var(--admin-text-soft)',
+                    }}>
+                      {paymentIcon(order.payment_method)}
+                    </span>
+                  </td>
+                  <td><span className={statusBadge(order.order_status)} style={{ textTransform: 'capitalize' }}>{order.order_status}</span></td>
                 </tr>
-              </thead>
-              <tbody>
-                {recentOrders.map((order: any) => (
-                  <tr key={order.id} className="border-b border-gray-800/50 hover:bg-gray-800/40 transition">
-                    <td className="px-6 py-4 font-mono text-xs text-gray-300">{order.id.slice(0, 8).toUpperCase()}</td>
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-sm">{order.customer_name}</p>
-                      <p className="text-xs text-gray-400">{order.customer_phone}</p>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-red-400 text-sm">Rs. {order.total_amount?.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm text-gray-300">{paymentLabel(order.payment_method)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${statusBadge(order.order_status)}`}>
-                        {order.order_status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {/* RECENT ACTIVITY */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-        <h2 className="text-lg font-bold mb-4">📋 Recent Activity</h2>
+      {/* Recent Activity */}
+      <div className="admin-card">
+        <h2 style={{ font: '600 16px var(--admin-font-ui)', color: 'var(--admin-text)', margin: '0 0 16px' }}>Recent Activity</h2>
         {recentActivity.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No activity logged yet</p>
+          <div className="admin-empty" style={{ padding: '30px 16px' }}><p>No activity logged yet</p></div>
         ) : (
-          <div className="space-y-3">
-            {recentActivity.map((log: any) => (
-              <div key={log.id} className="flex items-start gap-3 bg-gray-800/50 rounded-xl p-3">
-                <span className="text-lg mt-0.5">
-                  {log.action === 'purchase' ? '🛍️' : log.action === 'signup' ? '👤' : log.action === 'login' ? '🔑' : log.action === 'page_view' ? '👁️' : log.action === 'add_to_cart' ? '🛒' : '📝'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">{log.user_name || log.user_email || 'Anonymous'}</p>
-                  <p className="text-xs text-gray-400">{log.action} {log.page ? `on ${log.page}` : ''}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {recentActivity.slice(0, 10).map((log: any) => {
+              const ai = actionIcon(log.action)
+              return (
+                <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--admin-surface-2)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: `${ai.color}20`, color: ai.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    font: '600 13px var(--admin-font-mono)', flexShrink: 0,
+                  }}>{ai.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)' }}>{log.user_name || log.user_email || 'Anonymous'}</div>
+                    <div style={{ font: '400 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)' }}>{log.action.replace(/_/g, ' ')} {log.page ? `on ${log.page}` : ''}</div>
+                  </div>
+                  <span style={{ font: '400 12px var(--admin-font-mono)', color: 'var(--admin-text-muted)', whiteSpace: 'nowrap' }}>
+                    {npShortDate(log.created_at)}
+                  </span>
                 </div>
-                <span className="text-xs text-gray-500 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
