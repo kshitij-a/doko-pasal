@@ -48,17 +48,26 @@ export default function AdminUsers() {
     const file = e.target.files?.[0]
     if (!file || !selectedUser) return
     setUploading(true)
-    const filePath = `avatars/${selectedUser.id}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`
-    const { error } = await supabase.storage.from('profile-avatars').upload(filePath, file)
-    if (error) { showToast('Upload failed: ' + error.message); setUploading(false); return }
-    const { data: urlData } = supabase.storage.from('profile-avatars').getPublicUrl(filePath)
-    const avatarUrl = urlData.publicUrl
-    const res = await adminFetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: selectedUser.id, data: { avatar_url: avatarUrl } }) })
-    if (res.ok) {
-      setSelectedUser({ ...selectedUser, avatar_url: avatarUrl })
-      showToast('Profile picture updated')
-      fetchUsers()
-    }
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('userId', selectedUser.id)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch('/api/admin/upload-avatar', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.url) {
+        setSelectedUser({ ...selectedUser, avatar_url: data.url })
+        showToast('Profile picture updated')
+        fetchUsers()
+      } else {
+        showToast(data.error || 'Upload failed')
+      }
+    } catch (e) { showToast('Upload failed') }
     setUploading(false)
   }
 
@@ -101,8 +110,13 @@ export default function AdminUsers() {
   }
 
   const viewUserOrders = async (user: any) => {
-    const { data } = await supabase.from('orders').select('*, order_items(*)').eq('user_id', user.id).order('created_at', { ascending: false })
-    setUserOrders(data || [])
+    try {
+      const res = await adminFetch(`/api/admin/users?ordersForUser=${user.id}`)
+      const data = await res.json()
+      setUserOrders(data.orders || [])
+    } catch (e) {
+      setUserOrders([])
+    }
     setShowOrders(true)
     setSelectedUser(user)
   }
@@ -119,11 +133,15 @@ export default function AdminUsers() {
   const deleteOrder = async (orderId: string) => {
     if (!confirm('Delete this order? This cannot be undone.')) return
     try {
-      await supabase.from('order_items').delete().eq('order_id', orderId)
-      await supabase.from('orders').delete().eq('id', orderId)
-      showToast('Order deleted')
-      setUserOrders(userOrders.filter(o => o.id !== orderId))
-      fetchUsers()
+      const res = await adminFetch(`/api/admin/users?action=delete-order&orderId=${orderId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (json.success) {
+        showToast('Order deleted')
+        setUserOrders(userOrders.filter(o => o.id !== orderId))
+        fetchUsers()
+      } else {
+        showToast(json.error || 'Failed to delete order')
+      }
     } catch (e) { showToast('Failed') }
   }
 

@@ -93,6 +93,17 @@ export async function GET(request: Request) {
       totalSpent: userStats[u.id]?.totalSpent || 0,
     }))
 
+    // Support fetching orders for a specific user
+    const ordersForUserId = searchParams.get('ordersForUser')
+    if (ordersForUserId) {
+      const { data: orders } = await supabaseAdmin
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('user_id', ordersForUserId)
+        .order('created_at', { ascending: false })
+      return NextResponse.json({ orders: orders || [] })
+    }
+
     return NextResponse.json({ users: enriched })
   } catch (error: any) {
     return NextResponse.json({ error: error.message, users: [] }, { status: 200 })
@@ -149,6 +160,15 @@ export async function DELETE(request: Request) {
       const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo: `${baseUrl}/auth/reset-password`, data: { reset_only: true } })
       if (error) throw error
       return NextResponse.json({ success: true, message: 'Reset password link sent to ' + email })
+    }
+
+    if (action === 'delete-order') {
+      const orderId = searchParams.get('orderId')
+      if (!orderId) return NextResponse.json({ error: 'Order ID required' }, { status: 400 })
+      await supabaseAdmin.from('order_items').delete().eq('order_id', orderId)
+      const { error } = await supabaseAdmin.from('orders').delete().eq('id', orderId)
+      if (error) throw error
+      return NextResponse.json({ success: true })
     }
 
     const userId = searchParams.get('userId')
