@@ -107,6 +107,12 @@ export async function PATCH(request: Request) {
     const body = await request.json()
     const { userId, data } = body
 
+    if (userId === '__order__' && data?.orderId) {
+      const { error } = await supabaseAdmin.from('orders').update({ order_status: data.order_status }).eq('id', data.orderId)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: data,
@@ -126,6 +132,25 @@ export async function DELETE(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url)
+    const action = searchParams.get('action')
+
+    if (action === 'magic-link') {
+      const email = searchParams.get('email')
+      if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo: process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me' })
+      if (error) throw error
+      return NextResponse.json({ success: true, message: 'Magic link sent to ' + email })
+    }
+
+    if (action === 'reset-password') {
+      const email = searchParams.get('email')
+      if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me'
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo: `${baseUrl}/auth/reset-password`, data: { reset_only: true } })
+      if (error) throw error
+      return NextResponse.json({ success: true, message: 'Reset password link sent to ' + email })
+    }
+
     const userId = searchParams.get('userId')
     if (!userId) return NextResponse.json({ error: 'User ID required' }, { status: 400 })
 
