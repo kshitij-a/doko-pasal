@@ -20,10 +20,13 @@ export default function Wishlist() {
     try {
       const savedWishlist = localStorage.getItem('wishlist')
       if (savedWishlist) {
-      const ids = JSON.parse(savedWishlist)
-      setWishlist(ids)
-      if (ids.length > 0) fetchWishlistProducts(ids)
-      else setLoading(false)
+        const ids = JSON.parse(savedWishlist)
+        setWishlist(ids)
+        if (ids.length > 0) fetchWishlistProducts(ids)
+        else setLoading(false)
+      } else {
+        setLoading(false)
+      }
     } catch (e) { console.error('Failed to parse wishlist:', e); setLoading(false) }
   }, [])
 
