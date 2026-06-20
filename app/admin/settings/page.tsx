@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 
 const SETTINGS_GROUPS = [
   { label: 'Store Info', icon: '🏪', keys: ['store_name', 'store_tagline', 'store_logo', 'about_text'] },
@@ -30,7 +31,7 @@ export default function AdminSettings() {
   }
 
   const fetchSettings = async () => {
-    const res = await fetch('/api/admin/settings')
+    const res = await adminFetch('/api/admin/settings')
     const data = await res.json()
     setSettings(data.settings || {})
     setLoading(false)
@@ -41,7 +42,7 @@ export default function AdminSettings() {
   const saveSettings = async () => {
     setSaving(true)
     try {
-      await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) })
+      await adminFetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) })
       showToast('Settings saved successfully')
     } catch (e) { showToast('Failed to save') }
     setSaving(false)

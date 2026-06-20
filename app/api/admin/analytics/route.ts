@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifyAdminAccess } from '../../../../lib/admin-api'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const now = new Date()
     const thirtyDaysAgo = new Date()

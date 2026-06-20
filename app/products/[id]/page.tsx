@@ -36,10 +36,14 @@ export default function ProductDetail() {
       logActivity('product_view', { product_id: id }, `/products/${id}`)
     }
     checkUser()
-    const saved = localStorage.getItem('cart')
-    if (saved) setCart(JSON.parse(saved))
-    const savedWishlist = localStorage.getItem('wishlist')
-    if (savedWishlist) setWishlist(JSON.parse(savedWishlist))
+    try {
+      const saved = localStorage.getItem('cart')
+      if (saved) setCart(JSON.parse(saved))
+    } catch (e) { console.error('Failed to parse cart:', e) }
+    try {
+      const savedWishlist = localStorage.getItem('wishlist')
+      if (savedWishlist) setWishlist(JSON.parse(savedWishlist))
+    } catch (e) { console.error('Failed to parse wishlist:', e) }
   }, [])
 
   const checkUser = async () => {

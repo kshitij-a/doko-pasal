@@ -13,17 +13,18 @@ export default function Wishlist() {
 
   useEffect(() => {
     checkUser()
-    const savedCart = localStorage.getItem('cart')
-    if (savedCart) setCart(JSON.parse(savedCart))
-    const savedWishlist = localStorage.getItem('wishlist')
-    if (savedWishlist) {
+    try {
+      const savedCart = localStorage.getItem('cart')
+      if (savedCart) setCart(JSON.parse(savedCart))
+    } catch (e) { console.error('Failed to parse cart:', e) }
+    try {
+      const savedWishlist = localStorage.getItem('wishlist')
+      if (savedWishlist) {
       const ids = JSON.parse(savedWishlist)
       setWishlist(ids)
       if (ids.length > 0) fetchWishlistProducts(ids)
       else setLoading(false)
-    } else {
-      setLoading(false)
-    }
+    } catch (e) { console.error('Failed to parse wishlist:', e); setLoading(false) }
   }, [])
 
   const checkUser = async () => {

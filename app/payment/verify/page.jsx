@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabase'
 import Link from 'next/link'
 
 function VerifyContent() {
@@ -36,12 +35,6 @@ function VerifyContent() {
       const result = await response.json()
 
       if (result.success) {
-        await supabase.from('orders').update({
-          payment_status: 'paid',
-          order_status: 'processing',
-          transaction_id: result.transactionId,
-        }).eq('id', orderId)
-
         setStatus('success')
         setMessage(`Payment successful! Transaction ID: ${result.transactionId}`)
         setTimeout(() => router.push('/orders?success=true'), 3000)

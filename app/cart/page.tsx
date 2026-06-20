@@ -10,8 +10,10 @@ export default function Cart() {
   const router = useRouter()
 
   useEffect(() => {
-    const saved = localStorage.getItem('cart')
-    if (saved) setCart(JSON.parse(saved))
+    try {
+      const saved = localStorage.getItem('cart')
+      if (saved) setCart(JSON.parse(saved))
+    } catch (e) { console.error('Failed to parse cart:', e) }
     checkUser()
   }, [])
 

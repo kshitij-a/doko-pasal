@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 import { npFullDate } from '../../../lib/timezone'
 
 export default function AdminCoupons() {
@@ -24,7 +25,7 @@ export default function AdminCoupons() {
   }
 
   const fetchCoupons = async () => {
-    const res = await fetch('/api/admin/coupons')
+    const res = await adminFetch('/api/admin/coupons')
     const data = await res.json()
     setCoupons(data.coupons || [])
     setLoading(false)
@@ -38,10 +39,10 @@ export default function AdminCoupons() {
     if (!form.code || !form.value) { showToast('Code and value required'); return }
     try {
       if (editId) {
-        await fetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, ...form, value: Number(form.value), min_order: Number(form.min_order) || 0, max_uses: Number(form.max_uses) || 0 }) })
+        await adminFetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, ...form, value: Number(form.value), min_order: Number(form.min_order) || 0, max_uses: Number(form.max_uses) || 0 }) })
         showToast('Coupon updated')
       } else {
-        await fetch('/api/admin/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, value: Number(form.value), min_order: Number(form.min_order) || 0, max_uses: Number(form.max_uses) || 0 }) })
+        await adminFetch('/api/admin/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, value: Number(form.value), min_order: Number(form.min_order) || 0, max_uses: Number(form.max_uses) || 0 }) })
         showToast('Coupon created')
       }
       resetForm(); fetchCoupons()
@@ -49,13 +50,13 @@ export default function AdminCoupons() {
   }
 
   const toggleActive = async (coupon: any) => {
-    await fetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: coupon.id, active: !coupon.active }) })
+    await adminFetch('/api/admin/coupons', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: coupon.id, active: !coupon.active }) })
     fetchCoupons()
   }
 
   const deleteCoupon = async (coupon: any) => {
     if (!confirm(`Delete coupon "${coupon.code}"?`)) return
-    await fetch(`/api/admin/coupons?id=${coupon.id}`, { method: 'DELETE' })
+    await adminFetch(`/api/admin/coupons?id=${coupon.id}`, { method: 'DELETE' })
     showToast('Coupon deleted'); fetchCoupons()
   }
 

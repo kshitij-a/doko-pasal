@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 import { npDateTime } from '../../../lib/timezone'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,7 +27,7 @@ export default function AdminAnalytics() {
   }
 
   const fetchData = async () => {
-    try { const res = await fetch('/api/admin/analytics'); const d = await res.json(); setData(d) } catch (e) { console.error(e) }
+    try { const res = await adminFetch('/api/admin/analytics'); const d = await res.json(); setData(d) } catch (e) { console.error(e) }
     setLoading(false)
   }
 

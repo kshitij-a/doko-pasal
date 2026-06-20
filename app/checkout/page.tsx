@@ -15,8 +15,10 @@ export default function Checkout() {
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', landmark: '', note: '' })
 
   useEffect(() => {
-    const saved = localStorage.getItem('cart')
-    if (saved) setCart(JSON.parse(saved))
+    try {
+      const saved = localStorage.getItem('cart')
+      if (saved) setCart(JSON.parse(saved))
+    } catch (e) { console.error('Failed to parse cart:', e) }
     checkUser()
   }, [])
 
@@ -37,6 +39,12 @@ export default function Checkout() {
   const placeOrder = async () => {
     if (!form.name || !form.phone || !form.address || !form.city) {
       alert('Please fill all required delivery details!'); setStep(1); return
+    }
+    if (form.phone.length !== 10 || !/^(98|97)\d{8}$/.test(form.phone)) {
+      alert('Please enter a valid 10-digit Nepal phone number starting with 98 or 97.'); return
+    }
+    if (form.name.length > 100 || form.address.length > 200 || form.city.length > 100) {
+      alert('Input fields exceed maximum length.'); return
     }
     if (cart.length === 0) { alert('Your cart is empty!'); return }
 
@@ -69,6 +77,14 @@ export default function Checkout() {
       price: i.price,
     }))
     await supabase.from('order_items').insert(items)
+
+    try {
+      await fetch('/api/validate-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, userId: user.id }),
+      })
+    } catch (e) { console.error('Order validation error:', e) }
 
     if (paymentMethod === 'khalti') {
       const response = await fetch('/api/payment/initiate', {

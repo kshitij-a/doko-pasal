@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { adminFetch } from '../../lib/admin-fetch'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { npShortDate, npFullDate } from '../../lib/timezone'
@@ -30,7 +31,7 @@ export default function AdminDashboard() {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch('/api/admin/analytics')
+      const res = await adminFetch('/api/admin/analytics')
       const data = await res.json()
       if (data.stats) setStats(data.stats)
       if (data.chartData) setChartData(data.chartData)

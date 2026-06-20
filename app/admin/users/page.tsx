@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 import { npFullDate } from '../../../lib/timezone'
 
 export default function AdminUsers() {
@@ -27,7 +28,7 @@ export default function AdminUsers() {
   }
 
   const fetchUsers = async () => {
-    try { const res = await fetch('/api/admin/users'); const data = await res.json(); setUsers(data.users || []) } catch (e) { console.error(e) }
+    try { const res = await adminFetch('/api/admin/users'); const data = await res.json(); setUsers(data.users || []) } catch (e) { console.error(e) }
     setLoading(false)
   }
 
@@ -36,7 +37,7 @@ export default function AdminUsers() {
   const updateUser = async () => {
     if (!selectedUser) return
     try {
-      const res = await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: selectedUser.id, data: { full_name: editForm.full_name, phone: editForm.phone } }) })
+      const res = await adminFetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: selectedUser.id, data: { full_name: editForm.full_name, phone: editForm.phone } }) })
       if (res.ok) { showToast('User updated'); setEditMode(false); fetchUsers() }
     } catch (e) { showToast('Failed') }
   }
@@ -46,7 +47,7 @@ export default function AdminUsers() {
     const reason = newBanned ? prompt('Ban reason:') : ''
     if (newBanned && reason === null) return
     try {
-      const res = await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, data: { full_name: user.full_name || '', phone: user.phone || '', banned: newBanned, ban_reason: newBanned ? reason : '' } }) })
+      const res = await adminFetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, data: { full_name: user.full_name || '', phone: user.phone || '', banned: newBanned, ban_reason: newBanned ? reason : '' } }) })
       const json = await res.json()
       if (json.success) { showToast(newBanned ? 'User banned' : 'User unbanned'); fetchUsers() }
       else showToast(json.error || 'Failed')
@@ -56,7 +57,7 @@ export default function AdminUsers() {
   const deleteUser = async (user: any) => {
     if (!confirm(`Delete ${user.email}? This cannot be undone.`)) return
     try {
-      const res = await fetch(`/api/admin/users?userId=${user.id}`, { method: 'DELETE' })
+      const res = await adminFetch(`/api/admin/users?userId=${user.id}`, { method: 'DELETE' })
       const json = await res.json()
       if (json.success) { showToast('User deleted'); setSelectedUser(null); fetchUsers() }
       else showToast(json.error || 'Failed')

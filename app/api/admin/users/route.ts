@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifyAdminAccess } from '../../../lib/admin-api'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,6 +8,9 @@ const supabaseAdmin = createClient(
 )
 
 export async function GET(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -96,6 +100,9 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const body = await request.json()
     const { userId, data } = body
@@ -114,6 +121,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')

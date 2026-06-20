@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 
 export default function AdminBanners() {
   const router = useRouter()
@@ -24,7 +25,7 @@ export default function AdminBanners() {
   }
 
   const fetchBanners = async () => {
-    const res = await fetch('/api/admin/banners')
+    const res = await adminFetch('/api/admin/banners')
     const data = await res.json()
     setBanners(data.banners || [])
     setLoading(false)
@@ -51,10 +52,10 @@ export default function AdminBanners() {
     if (!form.image_url) { showToast('Upload an image first'); return }
     try {
       if (editId) {
-        await fetch('/api/admin/banners', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, ...form, position: Number(form.position) }) })
+        await adminFetch('/api/admin/banners', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, ...form, position: Number(form.position) }) })
         showToast('Banner updated')
       } else {
-        await fetch('/api/admin/banners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, position: Number(form.position) }) })
+        await adminFetch('/api/admin/banners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, position: Number(form.position) }) })
         showToast('Banner created')
       }
       resetForm(); fetchBanners()
@@ -62,7 +63,7 @@ export default function AdminBanners() {
   }
 
   const toggleActive = async (banner: any) => {
-    await fetch('/api/admin/banners', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: banner.id, active: !banner.active }) })
+    await adminFetch('/api/admin/banners', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: banner.id, active: !banner.active }) })
     fetchBanners()
   }
 

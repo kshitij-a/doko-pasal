@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifyAdminAccess } from '../../../lib/admin-api'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   const { data, error } = await supabase.from('site_settings').select('*')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const settings: Record<string, string> = {}
@@ -15,6 +19,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const body = await request.json()
     const { settings } = body

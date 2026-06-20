@@ -15,7 +15,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Doko Pasal - Nepal's Favourite Clothing Store",
-  description: "Shop the best clothing in Nepal. Men, Women and Kids wear. Fast delivery across Nepal.",
+  description: "Shop the best clothing in Nepal. Men, Women and Kids wear. Fast delivery across Nepal. Premium quality ethnic and modern fashion.",
+  keywords: ["nepal clothing", "doko pasal", "nepali dress", "men wear nepal", "women wear nepal", "kids wear nepal", "daura suruwal", "kurti", "saree"],
+  openGraph: {
+    title: "Doko Pasal - Nepal's Favourite Clothing Store",
+    description: "Shop the best clothing in Nepal. Men, Women and Kids wear. Fast delivery across Nepal.",
+    type: "website",
+    locale: "en_US",
+    siteName: "Doko Pasal",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

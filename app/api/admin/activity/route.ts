@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifyAdminAccess } from '../../../lib/admin-api'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 export async function GET(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -38,7 +42,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { error } = await supabase.from('activity_logs').insert(body)
+    if (!body.action) {
+      return NextResponse.json({ error: 'action is required' }, { status: 400 })
+    }
+    const { error } = await supabase.from('activity_logs').insert({
+      user_id: body.user_id || null,
+      user_email: body.user_email || null,
+      user_name: body.user_name || null,
+      action: body.action,
+      details: body.details || null,
+      page: body.page || null,
+    })
     if (error) throw error
     return NextResponse.json({ success: true })
   } catch (error: any) {

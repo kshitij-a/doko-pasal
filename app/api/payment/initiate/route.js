@@ -57,8 +57,11 @@ export async function POST(req) {
 
     // ====== ESEWA PAYMENT ======
     if (method === 'esewa') {
-      const merchantCode = process.env.ESEWA_MERCHANT_CODE || 'EPAYTEST'
-      const secretKey = process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q'
+      const merchantCode = process.env.ESEWA_MERCHANT_CODE
+      const secretKey = process.env.ESEWA_SECRET_KEY
+      if (!merchantCode || !secretKey) {
+        return NextResponse.json({ error: 'eSewa payment is not configured' }, { status: 500 })
+      }
       const transactionUuid = `${orderId}-${Date.now()}`
 
       const message = `total_amount=${amount},transaction_uuid=${transactionUuid},product_code=${merchantCode}`

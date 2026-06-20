@@ -1,6 +1,16 @@
 // File location: app/api/send-email/route.js
 import { NextResponse } from 'next/server'
 
+function escapeHtml(str) {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 export async function POST(req) {
   try {
     const body = await req.json()
@@ -16,8 +26,8 @@ export async function POST(req) {
     const itemsHtml = items.map(item => `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;">
-          ${item.product_name}
-          ${item.size ? `<span style="color: #9ca3af; font-size: 12px;"> (Size: ${item.size})</span>` : ''}
+          ${escapeHtml(item.product_name)}
+          ${item.size ? `<span style="color: #9ca3af; font-size: 12px;"> (Size: ${escapeHtml(item.size)})</span>` : ''}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151; text-align: center;">
           ${item.quantity}
@@ -34,6 +44,9 @@ export async function POST(req) {
       cod: '💵 Cash on Delivery',
       bank: '🏦 Bank Transfer'
     }
+
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://doko-pasal.vercel.app'
+    const senderEmail = process.env.RESEND_SENDER_EMAIL || 'Doko Pasal <onboarding@resend.dev>'
 
     const emailHtml = `
 <!DOCTYPE html>
@@ -59,7 +72,7 @@ export async function POST(req) {
         <span style="font-size: 30px;">🎉</span>
         <div>
           <h2 style="margin: 0; color: #15803d; font-size: 20px; font-weight: 700;">Order Confirmed!</h2>
-          <p style="margin: 4px 0 0; color: #166534; font-size: 14px;">Thank you ${customerName}! Your order has been placed successfully.</p>
+          <p style="margin: 4px 0 0; color: #166534; font-size: 14px;">Thank you ${escapeHtml(customerName)}! Your order has been placed successfully.</p>
         </div>
       </div>
     </div>
@@ -107,9 +120,9 @@ export async function POST(req) {
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
         <div style="background: #f9fafb; border-radius: 12px; padding: 16px;">
           <p style="margin: 0 0 8px; font-size: 12px; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">📍 Delivery To</p>
-          <p style="margin: 0; font-weight: 600; color: #111827; font-size: 14px;">${customerName}</p>
-          <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">${address}</p>
-          <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">📞 ${customerPhone}</p>
+          <p style="margin: 0; font-weight: 600; color: #111827; font-size: 14px;">${escapeHtml(customerName)}</p>
+          <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">${escapeHtml(address)}</p>
+          <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">📞 ${escapeHtml(customerPhone)}</p>
         </div>
         <div style="background: #f9fafb; border-radius: 12px; padding: 16px;">
           <p style="margin: 0 0 8px; font-size: 12px; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">💳 Payment</p>
@@ -143,7 +156,7 @@ export async function POST(req) {
 
       <!-- CTA BUTTON -->
       <div style="text-align: center; margin-bottom: 24px;">
-        <a href="https://doko-pasal.vercel.app/orders" 
+        <a href="${baseUrl}/orders" 
           style="display: inline-block; background: #b91c1c; color: white; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; text-decoration: none;">
           📦 Track My Order
         </a>
@@ -175,7 +188,7 @@ export async function POST(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Doko Pasal <onboarding@resend.dev>',
+        from: senderEmail,
         to: [customerEmail],
         subject: `🎉 Order Confirmed #${orderId.slice(0,8).toUpperCase()} - Doko Pasal`,
         html: emailHtml,
