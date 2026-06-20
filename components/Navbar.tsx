@@ -224,7 +224,16 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
               )}
 
               {user ? (
-                <Link href="/orders" className="ml-2 border border-[#C9963A] text-[#C9963A] px-4 py-2 rounded-full font-bold hover:bg-[#C9963A] hover:text-[#1E1A16] transition text-xs">My Orders</Link>
+                <>
+                  <Link href="/profile" className="ml-2 px-3 py-2 rounded-full hover:bg-white/10 transition text-xs font-semibold flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    Profile
+                  </Link>
+                  <Link href="/orders" className="ml-2 border border-[#C9963A] text-[#C9963A] px-4 py-2 rounded-full font-bold hover:bg-[#C9963A] hover:text-[#1E1A16] transition text-xs">My Orders</Link>
+                </>
               ) : (
                 <Link href="/auth/login" className="ml-2 bg-white text-[#1E1A16] px-4 py-2 rounded-full font-bold hover:bg-gray-100 transition text-xs">Login</Link>
               )}
@@ -318,6 +327,8 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
               <div className="border-t border-white/10 pt-2 mt-2">
                 {user ? (
                   <>
+                    <Link href="/profile" onClick={() => setMobileMenuOpen(false)}
+                      className="block px-4 py-3 rounded-xl hover:bg-white/10 font-semibold text-sm transition">Profile</Link>
                     <Link href="/orders" onClick={() => setMobileMenuOpen(false)}
                       className="block px-4 py-3 rounded-xl hover:bg-white/10 font-semibold text-sm transition">My Orders</Link>
                     <Link href="/wishlist" onClick={() => setMobileMenuOpen(false)}
