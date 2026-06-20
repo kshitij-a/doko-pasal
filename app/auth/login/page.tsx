@@ -72,6 +72,9 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-400"
               />
+              <div className="text-right mt-1">
+                <Link href="/auth/forgot-password" className="text-sm text-red-700 hover:underline font-medium">Forgot password?</Link>
+              </div>
             </div>
 
             <button
