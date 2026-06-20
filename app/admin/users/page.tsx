@@ -95,7 +95,7 @@ export default function AdminUsers() {
 
   const sendMagicLink = async (user: any) => {
     try {
-      const res = await adminFetch(`/api/admin/users?action=magic-link&email=${encodeURIComponent(user.email)}`, { method: 'DELETE' })
+      const res = await adminFetch('/api/admin/users', { method: 'POST', body: JSON.stringify({ action: 'magic-link', email: user.email }) })
       const json = await res.json()
       showToast(json.message || json.error || 'Done')
     } catch (e) { showToast('Failed to send magic link') }
@@ -103,7 +103,7 @@ export default function AdminUsers() {
 
   const sendResetPassword = async (user: any) => {
     try {
-      const res = await adminFetch(`/api/admin/users?action=reset-password&email=${encodeURIComponent(user.email)}`, { method: 'DELETE' })
+      const res = await adminFetch('/api/admin/users', { method: 'POST', body: JSON.stringify({ action: 'reset-password', email: user.email }) })
       const json = await res.json()
       showToast(json.message || json.error || 'Done')
     } catch (e) { showToast('Failed to send reset link') }

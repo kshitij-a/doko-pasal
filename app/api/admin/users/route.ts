@@ -137,6 +137,35 @@ export async function PATCH(request: Request) {
   }
 }
 
+export async function POST(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
+  try {
+    const body = await request.json()
+    const { action, email } = body
+
+    if (action === 'magic-link') {
+      if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo: process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me' })
+      if (error) throw error
+      return NextResponse.json({ success: true, message: 'Magic link sent to ' + email })
+    }
+
+    if (action === 'reset-password') {
+      if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me'
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo: `${baseUrl}/auth/reset-password`, data: { reset_only: true } })
+      if (error) throw error
+      return NextResponse.json({ success: true, message: 'Reset password link sent to ' + email })
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: Request) {
   const { authorized, response } = await verifyAdminAccess(request)
   if (!authorized) return response!
