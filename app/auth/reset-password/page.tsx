@@ -11,6 +11,35 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const handleTokens = async () => {
+      const hash = window.location.hash
+      if (hash) {
+        const params = new URLSearchParams(hash.substring(1))
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          if (error) {
+            setError('Invalid or expired link. Please request a new one.')
+          } else {
+            setReady(true)
+          }
+          window.history.replaceState(null, '', window.location.pathname)
+          return
+        }
+      }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        setReady(true)
+      } else {
+        setError('No valid session. Please use the link from your email.')
+      }
+    }
+    handleTokens()
+  }, [])
 
   const handleReset = async () => {
     if (password.length < 6) {
@@ -29,7 +58,7 @@ export default function ResetPassword() {
     if (error) {
       setError(error.message)
     } else {
-      setMessage('✅ Password updated! Redirecting to login...')
+      setMessage('Password updated! Redirecting...')
       setTimeout(() => router.push('/auth/login'), 2000)
     }
     setLoading(false)
@@ -38,7 +67,7 @@ export default function ResetPassword() {
   return (
     <main className="min-h-screen bg-red-50 flex flex-col">
       <nav className="bg-red-700 text-white px-6 py-4">
-        <Link href="/" className="text-2xl font-bold">🧺 Doko Pasal</Link>
+        <Link href="/" className="text-2xl font-bold">Doko Pasal</Link>
       </nav>
 
       <div className="flex-1 flex items-center justify-center px-4">
@@ -46,27 +75,29 @@ export default function ResetPassword() {
           <h1 className="text-3xl font-bold text-red-700 mb-2 text-center">Set New Password</h1>
           <p className="text-gray-500 text-center mb-6">Enter your new password below</p>
 
-          {error && <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">❌ {error}</div>}
+          {error && <div className="bg-red-100 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
           {message && <div className="bg-green-100 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{message}</div>}
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-400" />
+          {ready && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-400" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
+                  placeholder="Type password again"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-400" />
+              </div>
+              <button onClick={handleReset} disabled={loading}
+                className="w-full bg-red-700 text-white py-3 rounded-lg font-bold text-lg hover:bg-red-600 transition disabled:opacity-50">
+                {loading ? 'Updating...' : 'Update Password'}
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
-                placeholder="Type password again"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-400" />
-            </div>
-            <button onClick={handleReset} disabled={loading}
-              className="w-full bg-red-700 text-white py-3 rounded-lg font-bold text-lg hover:bg-red-600 transition disabled:opacity-50">
-              {loading ? 'Updating...' : 'Update Password'}
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </main>

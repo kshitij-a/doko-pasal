@@ -152,6 +152,20 @@ export async function PATCH(request: Request) {
   }
 }
 
+async function sendEmail(to: string, subject: string, html: string) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  if (!RESEND_API_KEY) throw new Error('Email service not configured')
+  const senderEmail = process.env.RESEND_SENDER_EMAIL || 'Doko Pasal <onboarding@resend.dev>'
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: senderEmail, to: [to], subject, html }),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.message || 'Failed to send email')
+  return result
+}
+
 export async function POST(request: Request) {
   const { authorized, response } = await verifyAdminAccess(request)
   if (!authorized) return response!
@@ -169,21 +183,59 @@ export async function POST(request: Request) {
 
     if (action === 'magic-link') {
       if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
-      const { error } = await client.auth.admin.inviteUserByEmail(email, {
-        redirectTo: process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me'
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me'
+      const { data, error } = await client.auth.admin.generateLink({
+        email,
+        type: 'magiclink',
+        redirectTo: baseUrl,
       })
       if (error) throw error
+      const actionLink = data?.properties?.action_link
+      if (!actionLink) throw new Error('Failed to generate link')
+
+      await sendEmail(email, 'Your Login Link - Doko Pasal', `
+<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:40px;background:#f9fafb;">
+<div style="max-width:500px;margin:0 auto;background:white;border-radius:16px;padding:30px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:40px;">🧺</div>
+<h1 style="color:#b91c1c;margin:8px 0;font-size:24px;">Doko Pasal</h1></div>
+<h2 style="color:#111827;text-align:center;">Login Link</h2>
+<p style="color:#6b7280;font-size:15px;text-align:center;">Click the button below to log in to your account:</p>
+<div style="text-align:center;margin:30px 0;">
+<a href="${actionLink}" style="display:inline-block;background:#b91c1c;color:white;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px;text-decoration:none;">Log In to Doko Pasal</a></div>
+<p style="color:#9ca3af;font-size:13px;text-align:center;">This link will expire in 24 hours. If you didn't request this, please ignore this email.</p>
+<hr style="border:none;border-top:#f3f4f6 1px solid;margin:24px 0;">
+<p style="color:#d1d5db;font-size:12px;text-align:center;">🧺 Doko Pasal — Made with ❤️ in Nepal</p>
+</div></body></html>`)
+
       return NextResponse.json({ success: true, message: 'Magic link sent to ' + email })
     }
 
     if (action === 'reset-password') {
       if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://birthdaysuprise.me'
-      const { error } = await client.auth.admin.inviteUserByEmail(email, {
+      const { data, error } = await client.auth.admin.generateLink({
+        email,
+        type: 'recovery',
         redirectTo: `${baseUrl}/auth/reset-password`,
-        data: { reset_only: true }
       })
       if (error) throw error
+      const actionLink = data?.properties?.action_link
+      if (!actionLink) throw new Error('Failed to generate link')
+
+      await sendEmail(email, 'Reset Your Password - Doko Pasal', `
+<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:40px;background:#f9fafb;">
+<div style="max-width:500px;margin:0 auto;background:white;border-radius:16px;padding:30px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:40px;">🔑</div>
+<h1 style="color:#b91c1c;margin:8px 0;font-size:24px;">Doko Pasal</h1></div>
+<h2 style="color:#111827;text-align:center;">Reset Your Password</h2>
+<p style="color:#6b7280;font-size:15px;text-align:center;">Click the button below to set a new password for your account:</p>
+<div style="text-align:center;margin:30px 0;">
+<a href="${actionLink}" style="display:inline-block;background:#b91c1c;color:white;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px;text-decoration:none;">Reset Password</a></div>
+<p style="color:#9ca3af;font-size:13px;text-align:center;">This link will expire in 1 hour. If you didn't request this, please ignore this email.</p>
+<hr style="border:none;border-top:#f3f4f6 1px solid;margin:24px 0;">
+<p style="color:#d1d5db;font-size:12px;text-align:center;">🧺 Doko Pasal — Made with ❤️ in Nepal</p>
+</div></body></html>`)
+
       return NextResponse.json({ success: true, message: 'Reset password link sent to ' + email })
     }
 
