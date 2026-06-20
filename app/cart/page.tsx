@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 
 export default function Cart() {
-  const [cart, setCart] = useState([])
-  const [user, setUser] = useState(null)
+  const [cart, setCart] = useState<any[]>([])
+  const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
   useEffect(() => {

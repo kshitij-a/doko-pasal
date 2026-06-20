@@ -7,8 +7,8 @@ import { logActivity } from '../../lib/activity'
 
 export default function Checkout() {
   const router = useRouter()
-  const [cart, setCart] = useState([])
-  const [user, setUser] = useState(null)
+  const [cart, setCart] = useState<any[]>([])
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [step, setStep] = useState(1)

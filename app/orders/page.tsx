@@ -9,7 +9,7 @@ import Navbar from '../../components/Navbar'
 export default function Orders() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
   useEffect(() => { checkUserAndFetch() }, [])
