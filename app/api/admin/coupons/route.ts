@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { verifyAdminAccess } from '../../../../lib/admin-api'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key)
+}
 
 export async function GET(request: Request) {
   const { authorized, response } = await verifyAdminAccess(request)
   if (!authorized) return response!
 
+  const supabase = getClient()
   const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ coupons: data })
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   if (!authorized) return response!
 
   try {
+    const supabase = getClient()
     const body = await request.json()
     const { code, type, value, min_order, max_uses, expires_at } = body
 
@@ -46,6 +48,7 @@ export async function PATCH(request: Request) {
   if (!authorized) return response!
 
   try {
+    const supabase = getClient()
     const body = await request.json()
     const { id, ...updates } = body
 
@@ -62,6 +65,7 @@ export async function DELETE(request: Request) {
   if (!authorized) return response!
 
   try {
+    const supabase = getClient()
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
