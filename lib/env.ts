@@ -9,11 +9,20 @@ const requiredPaymentVars = [
   'ESEWA_SECRET_KEY',
 ]
 
+const optionalPaymentVarsWithUatFallback = [
+  'ESEWA_FORM_URL',
+  'ESEWA_STATUS_URL',
+]
+
 export function validateEnv() {
   const missing: string[] = []
 
   for (const key of requiredServerVars) {
     if (!process.env[key]) missing.push(key)
+  }
+
+  for (const key of optionalPaymentVarsWithUatFallback) {
+    if (!process.env[key]) console.warn(`[ENV WARN] ${key} not set, using UAT fallback`)
   }
 
   if (missing.length > 0) {

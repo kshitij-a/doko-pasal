@@ -13,6 +13,10 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [step, setStep] = useState(1)
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', landmark: '', note: '' })
+  const [couponInput, setCouponInput] = useState('')
+  const [couponCode, setCouponCode] = useState('')
+  const [discount, setDiscount] = useState(0)
+  const [couponMsg, setCouponMsg] = useState('')
   const placingRef = useRef(false)
 
   useEffect(() => {
@@ -36,6 +40,25 @@ export default function Checkout() {
 
   const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0)
   const itemCount = cart.reduce((sum, i) => sum + i.qty, 0)
+  const payableTotal = Math.max(0, total - discount)
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim()
+    if (!code) return
+    setCouponMsg('')
+    try {
+      const res = await fetch('/api/validate-coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, total }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCouponMsg(data.error || 'Invalid coupon'); setDiscount(0); setCouponCode(''); return }
+      setDiscount(data.discount)
+      setCouponCode(data.couponCode)
+      setCouponMsg(`Coupon ${data.couponCode} applied: −Rs. ${data.discount.toLocaleString()}`)
+    } catch (e) { setCouponMsg('Could not validate coupon') }
+  }
 
   const placeOrder = async () => {
     if (!form.name || !form.phone || !form.address || !form.city) {
@@ -58,7 +81,9 @@ export default function Checkout() {
       customer_name: form.name,
       customer_phone: form.phone,
       customer_address: `${form.address}${form.landmark ? ', near ' + form.landmark : ''}, ${form.city}`,
-      total_amount: total,
+      total_amount: payableTotal,
+      coupon_code: couponCode || null,
+      discount_amount: discount,
       payment_method: paymentMethod,
       payment_status: 'pending',
       order_status: 'pending',
@@ -94,7 +119,7 @@ export default function Checkout() {
       const validateRes = await fetch('/api/validate-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, userId: user.id }),
+        body: JSON.stringify({ orderId: order.id, userId: user.id, couponCode: couponCode || undefined, finalize: paymentMethod === 'cod' || paymentMethod === 'bank' }),
       })
       const validation = await validateRes.json()
       if (!validateRes.ok || validation.valid === false) {
@@ -149,14 +174,23 @@ export default function Checkout() {
     }
 
     localStorage.removeItem('cart')
+    if (paymentMethod === 'cod' || paymentMethod === 'bank') {
+      try {
+        await fetch('/api/decrement-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.id }),
+        })
+      } catch (e) { console.log('Stock decrement error:', e) }
+    }
     if (paymentMethod === 'bank') {
-      alert(`Bank Transfer Details:\n\nBank: Nepal Investment Bank\nAccount Name: Doko Pasal\nAccount No: 001234567890\n\nAfter transfer, WhatsApp screenshot to: 98XXXXXXXX\nMention Order ID: ${order.id.slice(0,8).toUpperCase()}`)
+      alert(`Bank Transfer Details:\n\nBank: ${process.env.NEXT_PUBLIC_BANK_NAME || 'Nepal Investment Bank'}\nAccount Name: ${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'Doko Pasal'}\nAccount No: ${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NO || '001234567890'}\n\nAfter transfer, WhatsApp screenshot to: ${process.env.NEXT_PUBLIC_SHOP_WHATSAPP || '98XXXXXXXX'}\nMention Order ID: ${order.id.slice(0,8).toUpperCase()}`)
     }
     try {
       await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName: form.name, customerEmail: user.email, customerPhone: form.phone, orderId: order.id, items, total, paymentMethod, address: `${form.address}, ${form.city}` }),
+        body: JSON.stringify({ customerName: form.name, customerEmail: user.email, customerPhone: form.phone, orderId: order.id, items, total: payableTotal, paymentMethod, address: `${form.address}, ${form.city}` }),
       })
     } catch (e) { console.log('Email error:', e) }
     router.push('/orders?success=true')
@@ -286,7 +320,7 @@ export default function Checkout() {
                   <div className="flex justify-between"><span className="text-[#6B6560]">Phone</span><span className="font-bold text-[#1E1A16]">{form.phone}</span></div>
                   <div className="flex justify-between"><span className="text-[#6B6560]">Address</span><span className="font-bold text-[#1E1A16] text-right max-w-xs">{form.address}{form.landmark ? ', near '+form.landmark : ''}, {form.city}</span></div>
                   <div className="flex justify-between"><span className="text-[#6B6560]">Payment</span><span className="font-bold text-[#1E1A16]">{payments.find(p=>p.id===paymentMethod)?.label}</span></div>
-                  <div className="flex justify-between pt-2 border-t border-[#E8E3DB] text-lg"><span className="font-bold">Total</span><span className="font-bold text-[#B5293A]">Rs. {total.toLocaleString()}</span></div>
+                  <div className="flex justify-between pt-2 border-t border-[#E8E3DB] text-lg"><span className="font-bold">Total</span><span className="font-bold text-[#B5293A]">Rs. {payableTotal.toLocaleString()}</span></div>
                 </div>
                 {(paymentMethod === 'khalti' || paymentMethod === 'esewa') && (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-sm text-blue-700">
@@ -326,9 +360,15 @@ export default function Checkout() {
               </div>
               <div className="border-t border-[#E8E3DB] pt-3 space-y-2">
                 <div className="flex justify-between text-sm text-[#6B6560]"><span>Subtotal</span><span>Rs. {total.toLocaleString()}</span></div>
+                <div className="flex gap-2">
+                  <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} placeholder="Coupon code" className="input flex-1 py-2 text-sm" style={{ fontFamily: 'var(--font-display)' }} />
+                  <button onClick={applyCoupon} className="btn-ghost-dark px-4 py-2 text-sm whitespace-nowrap">Apply</button>
+                </div>
+                {couponMsg && <p className={`text-xs ${discount > 0 ? 'text-[#2A7D4F]' : 'text-[#B5293A]'}`}>{couponMsg}</p>}
+                {discount > 0 && <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Coupon ({couponCode})</span><span>−Rs. {discount.toLocaleString()}</span></div>}
                 <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Delivery</span><span>FREE</span></div>
                 <div className="flex justify-between font-bold text-xl text-[#B5293A] pt-2 border-t border-[#E8E3DB]">
-                  <span>Total</span><span>Rs. {total.toLocaleString()}</span>
+                  <span>Total</span><span>Rs. {payableTotal.toLocaleString()}</span>
                 </div>
               </div>
             </div>

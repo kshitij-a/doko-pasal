@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '../../../components/Navbar'
 import CartDrawer from '../../../components/CartDrawer'
-import MobileBottomBar from '../../../components/MobileBottomBar'
 import { logActivity } from '../../../lib/activity'
 import { npFullDate } from '../../../lib/timezone'
 
@@ -27,6 +26,8 @@ export default function ProductDetail() {
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' })
   const [submittingReview, setSubmittingReview] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
+  const [showSizeGuide, setShowSizeGuide] = useState(false)
+  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([])
 
   useEffect(() => {
     // Get product ID from the URL
@@ -65,6 +66,17 @@ export default function ProductDetail() {
         setProduct(data)
         loadRelated(data.category, data.id)
         loadReviews(data.id)
+        try {
+          const raw = localStorage.getItem('recentlyViewed')
+          const ids: string[] = raw ? JSON.parse(raw) : []
+          const updated = [data.id, ...ids.filter((x: string) => x !== data.id)].slice(0, 8)
+          localStorage.setItem('recentlyViewed', JSON.stringify(updated))
+          const others = updated.filter((x: string) => x !== data.id).slice(0, 4)
+          if (others.length > 0) {
+            const { data: rec } = await supabase.from('products').select('*').in('id', others)
+            if (rec) setRecentlyViewed(rec)
+          }
+        } catch (e) { console.error('Failed to track recently viewed:', e) }
       }
     } catch (err) { console.error('Failed to load product:', err) }
     finally { setLoading(false) }
@@ -292,10 +304,15 @@ export default function ProductDetail() {
               </div>
             )}
 
-            <div className="flex items-baseline gap-3 mb-5">
+            <div className="flex items-baseline gap-3 mb-5 flex-wrap">
               <span className="text-4xl font-extrabold text-red-700">Rs. {effPrice(product)?.toLocaleString()}</span>
               {product.sale_price && product.sale_price < product.price && (
-                <span className="text-gray-400 line-through text-lg">Rs. {product.price?.toLocaleString()}</span>
+                <>
+                  <span className="text-gray-400 line-through text-lg">Rs. {product.price?.toLocaleString()}</span>
+                  <span className="bg-red-700 text-white text-xs font-extrabold px-2 py-1 rounded-full">
+                    {Math.round((product.price - product.sale_price) / product.price * 100)}% OFF
+                  </span>
+                </>
               )}
               <span className="text-green-600 text-sm font-bold bg-green-50 px-2 py-0.5 rounded">Free Delivery</span>
             </div>
@@ -306,7 +323,10 @@ export default function ProductDetail() {
 
             {product.sizes && product.sizes.length > 0 && (
               <div className="mb-5">
-                <p className="font-bold text-gray-800 mb-2">Select Size:</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-bold text-gray-800">Select Size:</p>
+                  <button onClick={() => setShowSizeGuide(true)} className="text-xs font-bold text-red-700 hover:underline">Size Guide</button>
+                </div>
                 <div className="flex gap-2 flex-wrap">
                   {product.sizes.map((size: string) => (
                     <button key={size} onClick={() => setSelectedSize(size)}
@@ -319,6 +339,21 @@ export default function ProductDetail() {
                     </button>
                   ))}
                 </div>
+                {showSizeGuide && (
+                  <dialog open className="fixed inset-0 z-[210] m-auto bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-sm">
+                    <p className="font-extrabold text-gray-900 mb-3">Size Guide (in)</p>
+                    <table className="w-full text-sm text-gray-700 mb-4">
+                      <thead><tr className="text-left text-gray-400 text-xs"><th className="py-1">Size</th><th>Chest</th><th>Length</th></tr></thead>
+                      <tbody>
+                        <tr className="border-t"><td className="py-1.5 font-bold">S</td><td>38</td><td>27</td></tr>
+                        <tr className="border-t"><td className="py-1.5 font-bold">M</td><td>40</td><td>28</td></tr>
+                        <tr className="border-t"><td className="py-1.5 font-bold">L</td><td>42</td><td>29</td></tr>
+                        <tr className="border-t"><td className="py-1.5 font-bold">XL</td><td>44</td><td>30</td></tr>
+                      </tbody>
+                    </table>
+                    <button onClick={() => setShowSizeGuide(false)} className="w-full bg-red-700 text-white py-2.5 rounded-xl font-bold hover:bg-red-600">Close</button>
+                  </dialog>
+                )}
               </div>
             )}
 
@@ -406,7 +441,7 @@ export default function ProductDetail() {
             <div className="max-w-2xl">
               {avgRating && (
                 <div className="bg-gray-50 rounded-2xl p-6 mb-6 flex items-center gap-6">
-                  <div className="text-center">
+                  <div className="text-center flex-shrink-0">
                     <p className="text-6xl font-extrabold text-gray-900">{avgRating}</p>
                     <div className="flex justify-center mt-1">
                       {[1,2,3,4,5].map(star => (
@@ -414,6 +449,22 @@ export default function ProductDetail() {
                       ))}
                     </div>
                     <p className="text-gray-500 text-sm mt-1">{reviews.length} reviews</p>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    {[5,4,3,2,1].map(star => {
+                      const c = reviews.filter((r: any) => r.rating === star).length
+                      const pct = reviews.length ? Math.round(c / reviews.length * 100) : 0
+                      return (
+                        <div key={star} className="flex items-center gap-2 text-xs text-gray-500">
+                          <span className="w-3 font-bold">{star}</span>
+                          <span className="text-yellow-400">★</span>
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="w-8 text-right">{c}</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -522,17 +573,63 @@ export default function ProductDetail() {
             </div>
           </div>
         )}
+
+        {/* RECENTLY VIEWED */}
+        {recentlyViewed.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-6">Recently Viewed 🕘</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {recentlyViewed.map((item: any) => {
+                const itemImgs = item.image_urls?.length > 0 ? item.image_urls : item.image_url ? [item.image_url] : []
+                return (
+                  <Link key={item.id} href={`/products/${item.id}`}
+                    className="bg-white rounded-2xl shadow hover:shadow-lg transition overflow-hidden group">
+                    <div className="bg-gray-50 h-40 flex items-center justify-center overflow-hidden">
+                      {itemImgs.length > 0
+                        ? <img src={itemImgs[0]} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                        : <span className="text-5xl opacity-30">{item.category === "Men's Wear" ? '👔' : '👗'}</span>}
+                    </div>
+                    <div className="p-3">
+                      <p className="font-bold text-gray-800 text-sm truncate">{item.name}</p>
+                      <p className="text-red-700 font-extrabold mt-1">Rs. {(item.sale_price && item.sale_price < item.price ? item.sale_price : item.price)?.toLocaleString()}</p>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* IMAGE ZOOM MODAL */}
       {imgZoom && images.length > 0 && (
         <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center" onClick={() => setImgZoom(false)}>
-          <div className="relative max-w-3xl max-h-screen p-4">
+          <div className="relative max-w-3xl max-h-screen p-4" onClick={e => e.stopPropagation()}>
             <img src={images[selectedImg]} alt={product.name} className="max-w-full max-h-screen object-contain rounded-2xl" />
-            <button className="absolute top-2 right-2 bg-white text-gray-800 w-10 h-10 rounded-full font-extrabold text-xl flex items-center justify-center">×</button>
+            <button onClick={() => setImgZoom(false)} className="absolute top-2 right-2 bg-white text-gray-800 w-10 h-10 rounded-full font-extrabold text-xl flex items-center justify-center">×</button>
+            {images.length > 1 && (
+              <>
+                <button onClick={() => setSelectedImg(i => (i - 1 + images.length) % images.length)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 w-10 h-10 rounded-full font-extrabold text-xl flex items-center justify-center">‹</button>
+                <button onClick={() => setSelectedImg(i => (i + 1) % images.length)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 w-10 h-10 rounded-full font-extrabold text-xl flex items-center justify-center">›</button>
+              </>
+            )}
           </div>
         </div>
       )}
+
+      {/* STICKY MOBILE ATC BAR */}
+      <div className="fixed bottom-0 left-0 right-0 z-[110] md:hidden bg-white border-t border-gray-200 px-4 py-2.5 flex gap-2 safe-area-bottom">
+        <button onClick={addToCart} disabled={product.stock === 0}
+          className="flex-1 border-2 border-red-700 text-red-700 py-3 rounded-2xl font-extrabold hover:bg-red-50 transition disabled:opacity-50">
+          🛒 Add
+        </button>
+        <button onClick={buyNow} disabled={product.stock === 0}
+          className="flex-1 bg-red-700 text-white py-3 rounded-2xl font-extrabold hover:bg-red-600 transition disabled:opacity-50">
+          ⚡ Buy Now · Rs. {effPrice(product)?.toLocaleString()}
+        </button>
+      </div>
 
       <CartDrawer
         open={cartOpen}
@@ -553,8 +650,6 @@ export default function ProductDetail() {
           localStorage.setItem('cart', JSON.stringify(newCart))
         }}
       />
-
-      <MobileBottomBar cartCount={cartCount} cartTotal={cartTotal} onCartOpen={() => setCartOpen(true)} />
 
       <footer className="bg-red-700 text-white py-10 text-center mt-16 hidden sm:block">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>

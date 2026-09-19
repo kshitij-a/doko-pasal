@@ -10,6 +10,7 @@ export default function Wishlist() {
   const [wishlist, setWishlist] = useState<string[]>([])
   const [user, setUser] = useState<any>(null)
   const [toast, setToast] = useState('')
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     checkUser()
@@ -64,9 +65,14 @@ export default function Wishlist() {
 
   const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
 
-  const addToCart = (product: any) => {
-    const selectedSize = product.sizes?.[0] || 'Free Size'
-    const key = `${product.id}-${selectedSize}`
+  const addToCart = (product: any, size?: string) => {
+    const selectedSize = size || selectedSizes[product.id] || ''
+    if (product.sizes?.length > 0 && !selectedSize) {
+      showToast('⚠️ Please select a size or view product')
+      return
+    }
+    const finalSize = selectedSize || 'Free Size'
+    const key = `${product.id}-${finalSize}`
     const price = effPrice(product)
     const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
     let newCart
@@ -77,7 +83,7 @@ export default function Wishlist() {
       newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
     } else {
       if (product.stock != null && product.stock < 1) { showToast('⚠️ Out of stock!'); return }
-      newCart = [...cart, { ...product, price, qty: 1, selectedSize }]
+      newCart = [...cart, { ...product, price, qty: 1, selectedSize: finalSize }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
@@ -116,7 +122,7 @@ export default function Wishlist() {
   const cartCount = cart.reduce((a: number, i: any) => a + i.qty, 0)
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 pb-28 sm:pb-0">
 
       {/* TOAST */}
       {toast && (
@@ -232,18 +238,30 @@ export default function Wishlist() {
 
                     {/* Sizes */}
                     {product.sizes && product.sizes.length > 0 && (
-                      <div className="flex gap-1 flex-wrap mb-3">
-                        {product.sizes.slice(0, 4).map((size: string) => (
-                          <span key={size} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-semibold">{size}</span>
-                        ))}
-                        {product.sizes.length > 4 && (
-                          <span className="text-xs text-gray-400">+{product.sizes.length - 4} more</span>
+                      <div>
+                        <div className="size-pills mb-2">
+                          {product.sizes.map((size: string) => (
+                            <button key={size} onClick={() => setSelectedSizes(s => ({ ...s, [product.id]: size }))}
+                              className={`size-pill ${selectedSizes[product.id] === size ? 'active' : ''}`}>
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                        {!selectedSizes[product.id] && (
+                          <Link href={`/products/${product.id}`} className="text-xs font-bold text-[#B5293A] hover:underline">
+                            Select options on product page →
+                          </Link>
                         )}
                       </div>
                     )}
 
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                      <span className="text-xl font-extrabold text-red-700">Rs. {effPrice(product)?.toLocaleString()}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-extrabold text-red-700">Rs. {effPrice(product)?.toLocaleString()}</span>
+                        {product.sale_price && product.sale_price < product.price && (
+                          <span className="text-gray-400 line-through text-sm">Rs. {product.price?.toLocaleString()}</span>
+                        )}
+                      </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => removeFromWishlist(product.id)}

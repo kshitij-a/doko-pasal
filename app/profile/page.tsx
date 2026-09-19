@@ -83,7 +83,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="min-h-screen bg-slate-950 text-white pb-28 sm:pb-0">
       <div className="max-w-6xl mx-auto px-4 py-10">
         <div className="flex flex-col gap-6 lg:flex-row">
           <aside className="w-full lg:w-1/3 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-lg">

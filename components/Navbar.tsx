@@ -18,6 +18,8 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [products, setProducts] = useState<any[]>([])
   const [scrolled, setScrolled] = useState(false)
+  const [localCart, setLocalCart] = useState(0)
+  const [localWishlist, setLocalWishlist] = useState(0)
   const megaRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const mobileSearchRef = useRef<HTMLDivElement>(null)
@@ -25,9 +27,21 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
   useEffect(() => {
     checkUser()
     fetchProducts()
+    const readCounts = () => {
+      try {
+        const c = localStorage.getItem('cart')
+        setLocalCart(c ? JSON.parse(c).reduce((a: number, i: any) => a + (i.qty || 0), 0) : 0)
+      } catch { setLocalCart(0) }
+      try {
+        const w = localStorage.getItem('wishlist')
+        setLocalWishlist(w ? JSON.parse(w).length : 0)
+      } catch { setLocalWishlist(0) }
+    }
+    readCounts()
+    window.addEventListener('storage', readCounts)
     const handleScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    return () => { window.removeEventListener('scroll', handleScroll); window.removeEventListener('storage', readCounts) }
   }, [])
 
   useEffect(() => {
@@ -74,6 +88,9 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
   const closeSuggestions = () => {
     setTimeout(() => setShowSuggestions(false), 150)
   }
+
+  const effCartCount = cartCount > 0 ? cartCount : localCart
+  const effWishlistCount = wishlistCount > 0 ? wishlistCount : localWishlist
 
   const categories = [
     { name: "Men's Wear", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" },
@@ -164,7 +181,7 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                       <div className="p-5 border-r border-gray-100">
                         <p className="text-[10px] font-bold text-[#9E9994] uppercase tracking-widest mb-3">Categories</p>
                         {categories.map(cat => (
-                          <Link key={cat.name} href={`/products?category=${cat.name}`}
+                          <Link key={cat.name} href={`/products?category=${encodeURIComponent(cat.name)}`}
                             onClick={() => setMegaOpen(false)}
                             className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#FAF8F4] transition group">
                             <span className="text-lg">📋</span>
@@ -202,9 +219,9 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
                 </svg>
-                {wishlistCount > 0 && (
+                {effWishlistCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 bg-[#B5293A] text-white text-[9px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-extrabold">
-                    {wishlistCount}
+                    {effWishlistCount}
                   </span>
                 )}
               </Link>
@@ -215,9 +232,9 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/>
                   </svg>
-                  {cartCount > 0 && (
+                  {effCartCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-[#C9963A] text-[#1E1A16] text-[9px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-extrabold">
-                      {cartCount}
+                      {effCartCount}
                     </span>
                   )}
                 </button>
@@ -246,9 +263,9 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/>
                   </svg>
-                  {cartCount > 0 && (
+                  {effCartCount > 0 && (
                     <span className="absolute top-0.5 right-0.5 bg-[#C9963A] text-[#1E1A16] text-[9px] rounded-full min-w-[16px] h-[16px] flex items-center justify-center font-extrabold">
-                      {cartCount}
+                      {effCartCount}
                     </span>
                   )}
                 </button>
@@ -309,7 +326,7 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                 Shop All
               </Link>
               {categories.map(cat => (
-                <Link key={cat.name} href={`/products?category=${cat.name}`}
+                <Link key={cat.name} href={`/products?category=${encodeURIComponent(cat.name)}`}
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-4 py-3 rounded-xl hover:bg-white/10 font-semibold text-sm transition">
                   {cat.name}

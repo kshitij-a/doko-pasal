@@ -54,6 +54,9 @@ export async function POST(req) {
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://doko-pasal.vercel.app'
     const senderEmail = process.env.RESEND_SENDER_EMAIL || 'Doko Pasal <onboarding@resend.dev>'
+    const bankName = process.env.BANK_NAME || 'Nepal Investment Bank'
+    const bankAccountName = process.env.BANK_ACCOUNT_NAME || 'Doko Pasal'
+    const bankAccountNo = process.env.BANK_ACCOUNT_NO || '001234567890'
 
     const emailHtml = `
 <!DOCTYPE html>
@@ -143,9 +146,9 @@ export async function POST(req) {
       ${paymentMethod === 'bank' ? `
       <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
         <p style="margin: 0 0 8px; font-weight: 700; color: #1d4ed8; font-size: 14px;">🏦 Bank Transfer Details</p>
-        <p style="margin: 0; color: #1e40af; font-size: 13px;">Bank: Nepal Investment Bank</p>
-        <p style="margin: 4px 0 0; color: #1e40af; font-size: 13px;">Account Name: Doko Pasal</p>
-        <p style="margin: 4px 0 0; color: #1e40af; font-size: 13px;">Account No: 001234567890</p>
+        <p style="margin: 0; color: #1e40af; font-size: 13px;">Bank: ${escapeHtml(bankName)}</p>
+        <p style="margin: 4px 0 0; color: #1e40af; font-size: 13px;">Account Name: ${escapeHtml(bankAccountName)}</p>
+        <p style="margin: 4px 0 0; color: #1e40af; font-size: 13px;">Account No: ${escapeHtml(bankAccountNo)}</p>
         <p style="margin: 8px 0 0; color: #1e40af; font-size: 13px; font-weight: 600;">Please send payment screenshot to confirm your order.</p>
       </div>
       ` : ''}

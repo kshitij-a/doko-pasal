@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import UserChatWidget from '../components/UserChatWidget';
+import MobileBottomBar from '../components/MobileBottomBar';
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://doko-pasal.vercel.app';
 
@@ -41,6 +42,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen flex flex-col">
         {children}
+        <MobileBottomBar />
         <UserChatWidget />
       </body>
     </html>

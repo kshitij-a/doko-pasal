@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase'
 import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import CartDrawer from '../../components/CartDrawer'
-import MobileBottomBar from '../../components/MobileBottomBar'
 import { logActivity } from '../../lib/activity'
 
 function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQuickAdd }: {
@@ -118,6 +117,9 @@ function ProductsInner() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('newest')
   const [saleOnly, setSaleOnly] = useState(false)
+  const [priceRange, setPriceRange] = useState('all')
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [sizeFilter, setSizeFilter] = useState('')
   const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
@@ -230,7 +232,12 @@ function ProductsInner() {
   if (sort === 'price-low') filtered.sort((a: any, b: any) => a.price - b.price)
   else if (sort === 'price-high') filtered.sort((a: any, b: any) => b.price - a.price)
   else if (sort === 'sale') filtered.sort((a: any, b: any) => ((b.price - (b.sale_price && b.sale_price < b.price ? b.sale_price : b.price)) - (a.price - (a.sale_price && a.sale_price < a.price ? a.sale_price : a.price))))
-  // 'popular' and 'newest' keep default (newest) order
+  // 'newest' keeps default order
+  if (priceRange === 'under2000') filtered = filtered.filter((p: any) => (p.sale_price && p.sale_price < p.price ? p.sale_price : p.price) < 2000)
+  else if (priceRange === 'mid') filtered = filtered.filter((p: any) => { const v = (p.sale_price && p.sale_price < p.price ? p.sale_price : p.price); return v >= 2000 && v <= 5000 })
+  else if (priceRange === 'over5000') filtered = filtered.filter((p: any) => (p.sale_price && p.sale_price < p.price ? p.sale_price : p.price) > 5000)
+  if (inStockOnly) filtered = filtered.filter((p: any) => p.stock == null || p.stock > 0)
+  if (sizeFilter) filtered = filtered.filter((p: any) => p.sizes?.includes(sizeFilter))
 
   const cartCount = cart.reduce((a: number, i: any) => a + i.qty, 0)
   const wishlistCount = wishlist.length
@@ -257,23 +264,49 @@ function ProductsInner() {
 
       {/* FILTER BAR */}
       <div className="bg-white border-b border-[#E8E3DB] px-4 py-3 sm:py-4 sticky top-[88px] sm:top-[92px] z-40">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => setCategory(cat)}
-                className={`filter-pill whitespace-nowrap flex-shrink-0 ${category === cat ? 'active' : ''}`}>
-                {cat}
-              </button>
-            ))}
+        <div className="max-w-6xl mx-auto flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {categories.map(cat => (
+                <button key={cat} onClick={() => setCategory(cat)}
+                  className={`filter-pill whitespace-nowrap flex-shrink-0 ${category === cat ? 'active' : ''}`}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <select value={sort} onChange={e => setSort(e.target.value)}
+              className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white flex-shrink-0 font-semibold text-[#6B6560] cursor-pointer">
+              <option value="newest">Newest</option>
+              <option value="sale">Sale</option>
+              <option value="price-low">Price ↑</option>
+              <option value="price-high">Price ↓</option>
+            </select>
           </div>
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white flex-shrink-0 font-semibold text-[#6B6560] cursor-pointer">
-            <option value="newest">Newest</option>
-            <option value="popular">Popular</option>
-            <option value="sale">Sale</option>
-            <option value="price-low">Price ↑</option>
-            <option value="price-high">Price ↓</option>
-          </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products..."
+              className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white flex-1 min-w-[140px]" />
+            <select value={priceRange} onChange={e => setPriceRange(e.target.value)}
+              className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white font-semibold text-[#6B6560] cursor-pointer">
+              <option value="all">All prices</option>
+              <option value="under2000">&lt; Rs. 2000</option>
+              <option value="mid">Rs. 2000-5000</option>
+              <option value="over5000">&gt; Rs. 5000</option>
+            </select>
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-[#6B6560] cursor-pointer whitespace-nowrap">
+              <input type="checkbox" checked={inStockOnly} onChange={e => setInStockOnly(e.target.checked)} className="accent-[#B5293A] w-4 h-4" />
+              In-stock
+            </label>
+            <div className="flex gap-1.5 items-center">
+              {['S', 'M', 'L', 'XL'].map(s => (
+                <button key={s} onClick={() => setSizeFilter(f => f === s ? '' : s)}
+                  className={`size-pill ${sizeFilter === s ? 'active' : ''}`}>{s}</button>
+              ))}
+            </div>
+            {(saleOnly || sort !== 'newest' || search || priceRange !== 'all' || inStockOnly || sizeFilter || category !== 'All') && (
+              <button onClick={() => { setCategory('All'); setSearch(''); setSaleOnly(false); setSort('newest'); setPriceRange('all'); setInStockOnly(false); setSizeFilter('') }}
+                className="text-[#B5293A] font-bold text-xs hover:underline whitespace-nowrap">Clear filters</button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -288,7 +321,7 @@ function ProductsInner() {
           <div className="text-center py-24">
             <div className="text-6xl mb-4">🧺</div>
             <p className="text-[#6B6560] text-lg font-semibold">No products found</p>
-            <button onClick={() => { setCategory('All'); setSearch('') }}
+            <button onClick={() => { setCategory('All'); setSearch(''); setSaleOnly(false); setSort('newest'); setPriceRange('all'); setInStockOnly(false); setSizeFilter('') }}
               className="mt-4 text-[#B5293A] font-bold text-sm hover:underline">Clear filters</button>
           </div>
         ) : (
@@ -318,8 +351,6 @@ function ProductsInner() {
         onRemove={removeCartItem}
         onUpdateQty={updateQty}
       />
-
-      <MobileBottomBar cartCount={cartCount} cartTotal={cartTotal} onCartOpen={() => setCartOpen(true)} />
 
       <footer className="bg-red-700 text-white py-8 text-center mt-8 sm:mt-10 hidden sm:block">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>

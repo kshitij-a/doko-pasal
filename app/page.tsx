@@ -10,6 +10,28 @@ export default function Home() {
   const [banners, setBanners] = useState<any[]>([])
   const [currentBanner, setCurrentBanner] = useState(0)
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
+  const [newsletterEmail, setNewsletterEmail] = useState('')
+  const [newsletterMsg, setNewsletterMsg] = useState('')
+
+  const submitNewsletter = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setNewsletterMsg('')
+    try {
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newsletterEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) setNewsletterMsg(data.error || 'Subscription failed.')
+      else {
+        setNewsletterMsg('Subscribed! Welcome to Doko Pasal.')
+        setNewsletterEmail('')
+      }
+    } catch {
+      setNewsletterMsg('Could not subscribe. Try again.')
+    }
+  }
 
   const safeBannerLink = (url: unknown) =>
     typeof url === 'string' && (url.startsWith('/') || url.startsWith('http://') || url.startsWith('https://')) ? url : '/products'
@@ -193,6 +215,51 @@ export default function Home() {
         </section>
       )}
 
+      {/* Bestsellers */}
+      {featuredProducts.filter(p => p.sale_price != null && p.sale_price < p.price).slice(0, 4).length > 0 && (
+        <section className="py-16 sm:py-20 px-6 sm:px-8 bg-[#FAF8F4]">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <p className="text-[10px] font-bold text-[#9E9994] uppercase tracking-[0.2em] mb-2">Loved By Many</p>
+                <h2 className="text-3xl sm:text-4xl font-bold text-[#1E1A16]" style={{ fontFamily: 'var(--font-display)' }}>Bestsellers</h2>
+              </div>
+              <Link href="/products?sale=true" className="text-sm font-bold text-[#B5293A] hover:text-[#8C1E2A] transition hidden sm:inline-flex items-center gap-1">
+                View All →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5">
+              {featuredProducts.filter(p => p.sale_price != null && p.sale_price < p.price).slice(0, 4).map((product) => {
+                const images = product.image_urls?.length > 0 ? product.image_urls : product.image_url ? [product.image_url] : []
+                return (
+                  <Link href={`/products/${product.id}`} key={product.id} className="product-card group">
+                    <div className="product-image-wrap">
+                      {images.length > 0
+                        ? <img src={images[0]} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                        : <div className="w-full h-full flex items-center justify-center text-4xl bg-[#F5F2EE]">🧺</div>
+                      }
+                      {product.sale_price && product.sale_price < product.price && (
+                        <span className="absolute top-3 left-3 badge-sale">SALE</span>
+                      )}
+                    </div>
+                    <div className="product-body">
+                      <p className="product-category">{product.category || 'Clothing'}</p>
+                      <p className="product-name truncate">{product.name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="price text-base">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+                        {product.sale_price && product.sale_price < product.price && (
+                          <span className="price-old text-sm">Rs. {product.price?.toLocaleString()}</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Trust Bar */}
       <section className="py-16 sm:py-20 px-6 sm:px-8 bg-[#F2EFE9]">
         <div className="max-w-5xl mx-auto">
@@ -219,6 +286,30 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="py-16 sm:py-20 px-6 sm:px-8 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-[10px] font-bold text-[#9E9994] uppercase tracking-[0.2em] mb-2">Reviews</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#1E1A16]" style={{ fontFamily: 'var(--font-display)' }}>What Customers Say</h2>
+            <div className="w-12 h-0.5 bg-[#C9963A] mx-auto mt-4 rounded-full" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {[
+              { name: 'Priya S. · Kathmandu', text: 'My kurta arrived in 2 days, perfect fitting and beautiful fabric. COD made it so easy!' },
+              { name: 'Anish M. · Pokhara', text: 'Ordered Daura Suruwal for my brother\u2019s wedding. Great quality, got so many compliments.' },
+              { name: 'Sneha K. · Chitwan', text: 'Easy return when the size was off — exchanged in 3 days, no hassle. Highly recommended!' },
+            ].map((t) => (
+              <div key={t.name} className="bg-[#FAF8F4] border border-[#E8E3DB] rounded-2xl p-6">
+                <p className="text-[#C9963A] text-sm mb-3">★★★★★</p>
+                <p className="text-sm text-[#6B6560] leading-relaxed mb-4">&ldquo;{t.text}&rdquo;</p>
+                <p className="text-xs font-bold text-[#1E1A16]">{t.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-[#1E1A16] text-white pt-16 pb-8 px-6 sm:px-8">
         <div className="max-w-6xl mx-auto">
@@ -239,8 +330,14 @@ export default function Home() {
             <div>
               <h4 className="text-[10px] font-bold text-[#C9963A] uppercase tracking-widest mb-4">Shop</h4>
               <ul className="space-y-2.5">
-                {["Men's Wear", "Women's Wear", "Kids' Wear", "New Arrivals", "Sale"].map(item => (
-                  <li key={item}><Link href="/products" className="text-sm text-white/50 hover:text-white transition">{item}</Link></li>
+                {[
+                  { label: "Men's Wear", href: "/products?category=Men's Wear" },
+                  { label: "Women's Wear", href: "/products?category=Women's Wear" },
+                  { label: "Kids' Wear", href: "/products?category=Kids' Wear" },
+                  { label: 'New Arrivals', href: '/products?sort=newest' },
+                  { label: 'Sale', href: '/products?sale=true' },
+                ].map(item => (
+                  <li key={item.label}><Link href={item.href} className="text-sm text-white/50 hover:text-white transition">{item.label}</Link></li>
                 ))}
               </ul>
             </div>
@@ -249,8 +346,14 @@ export default function Home() {
             <div>
               <h4 className="text-[10px] font-bold text-[#C9963A] uppercase tracking-widest mb-4">Help</h4>
               <ul className="space-y-2.5">
-                {["About Us", "Contact Us", "FAQ", "Return Policy", "Track Order"].map(item => (
-                  <li key={item}><Link href="/" className="text-sm text-white/50 hover:text-white transition">{item}</Link></li>
+                {[
+                  { label: 'About Us', href: '/about' },
+                  { label: 'Contact Us', href: '/contact' },
+                  { label: 'FAQ', href: '/faq' },
+                  { label: 'Return Policy', href: '/return-policy' },
+                  { label: 'Track Order', href: '/track-order' },
+                ].map(item => (
+                  <li key={item.label}><Link href={item.href} className="text-sm text-white/50 hover:text-white transition">{item.label}</Link></li>
                 ))}
               </ul>
             </div>
@@ -259,16 +362,17 @@ export default function Home() {
             <div>
               <h4 className="text-[10px] font-bold text-[#C9963A] uppercase tracking-widest mb-4">Connect</h4>
               <ul className="space-y-2.5">
-                <li><a href="#" className="text-sm text-white/50 hover:text-white transition">Facebook</a></li>
-                <li><a href="#" className="text-sm text-white/50 hover:text-white transition">Instagram</a></li>
-                <li><a href="#" className="text-sm text-white/50 hover:text-white transition">TikTok</a></li>
+                <li><a href="https://facebook.com/dokopasal" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">Facebook</a></li>
+                <li><a href="https://instagram.com/dokopasal" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">Instagram</a></li>
+                <li><a href="https://tiktok.com/@dokopasal" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">TikTok</a></li>
               </ul>
               <div className="mt-6">
                 <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">Newsletter</p>
-                <div className="flex">
-                  <input type="email" placeholder="Your email" className="flex-1 bg-white/10 border border-white/15 rounded-l-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#C9963A]/50" />
-                  <button className="bg-[#C9963A] text-[#1E1A16] px-4 py-2 rounded-r-lg font-bold text-sm hover:bg-[#B5293A] hover:text-white transition">→</button>
-                </div>
+                <form onSubmit={submitNewsletter} className="flex">
+                  <input type="email" required value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} placeholder="Your email" className="flex-1 min-w-0 bg-white/10 border border-white/15 rounded-l-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#C9963A]/50" />
+                  <button type="submit" className="bg-[#C9963A] text-[#1E1A16] px-4 py-2 rounded-r-lg font-bold text-sm hover:bg-[#B5293A] hover:text-white transition">→</button>
+                </form>
+                {newsletterMsg && <p className="text-xs text-white/60 mt-2" role="status">{newsletterMsg}</p>}
               </div>
             </div>
           </div>

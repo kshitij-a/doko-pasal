@@ -7,15 +7,64 @@ import { supabase } from '../../lib/supabase'
 export default function Cart() {
   const [cart, setCart] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
+  const [toast, setToast] = useState('')
+  const [upsell, setUpsell] = useState<any[]>([])
   const router = useRouter()
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2500)
+  }
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('cart')
-      if (saved) setCart(JSON.parse(saved))
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setCart(parsed)
+        if (parsed.length > 0) fetchUpsell(parsed[0]?.category, parsed.map((i: any) => i.id))
+      }
     } catch (e) { console.error('Failed to parse cart:', e) }
     checkUser()
   }, [])
+
+  const fetchUpsell = async (category: string, excludeIds: string[]) => {
+    try {
+      let q = supabase.from('products').select('*').limit(4)
+      if (category) q = q.eq('category', category)
+      const { data } = await q
+      if (data) setUpsell(data.filter((p: any) => !excludeIds.includes(p.id)).slice(0, 4))
+    } catch (e) { console.error('Failed to fetch upsell:', e) }
+  }
+
+  const quickAdd = (product: any) => {
+    const selectedSize = product.sizes?.[0] || 'Free Size'
+    const key = `${product.id}-${selectedSize}`
+    const existing = cart.find(i => `${i.id}-${i.selectedSize}` === key)
+    let updated
+    if (existing) {
+      let newQty = existing.qty + 1
+      if (product.stock != null) newQty = Math.min(newQty, product.stock)
+      updated = cart.map(i => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty } : i)
+    } else {
+      updated = [...cart, { ...product, qty: 1, selectedSize }]
+    }
+    setCart(updated)
+    localStorage.setItem('cart', JSON.stringify(updated))
+    showToast(`✅ "${product.name}" added!`)
+  }
+
+  const saveForLater = (key: string, id: string) => {
+    try {
+      const raw = localStorage.getItem('wishlist')
+      const ids: string[] = raw ? JSON.parse(raw) : []
+      if (!ids.includes(id)) localStorage.setItem('wishlist', JSON.stringify([...ids, id]))
+    } catch (e) { console.error('Failed to save for later:', e) }
+    const updated = cart.filter(i => `${i.id}-${i.selectedSize}` !== key)
+    setCart(updated)
+    localStorage.setItem('cart', JSON.stringify(updated))
+    showToast('❤️ Saved for later')
+  }
 
   const checkUser = async () => {
     const { data } = await supabase.auth.getUser()
@@ -40,9 +89,9 @@ export default function Cart() {
   }
 
   const clearCart = () => {
-    if (!confirm('Clear all items from cart?')) return
     setCart([])
     localStorage.removeItem('cart')
+    showToast('🗑️ Cart cleared')
   }
 
   const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0)
@@ -50,15 +99,21 @@ export default function Cart() {
 
   const handleCheckout = () => {
     if (!user) {
-      alert('Please login first to place an order!')
-      router.push('/auth/login')
+      showToast('⚠️ Please login first to place an order!')
+      setTimeout(() => router.push('/auth/login'), 800)
       return
     }
     router.push('/checkout')
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 pb-28 sm:pb-0">
+      {/* TOAST */}
+      {toast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
+          {toast}
+        </div>
+      )}
       {/* NAVBAR */}
       <nav className="bg-red-700 text-white px-6 py-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
         <Link href="/" className="text-2xl font-extrabold">🧺 Doko Pasal</Link>
@@ -68,7 +123,7 @@ export default function Cart() {
       </nav>
 
       <div className="max-w-4xl mx-auto px-4 py-10">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-extrabold text-gray-900">🛒 Your Cart</h1>
           {cart.length > 0 && (
             <button onClick={clearCart} className="text-red-500 text-sm font-semibold hover:underline">
@@ -76,6 +131,15 @@ export default function Cart() {
             </button>
           )}
         </div>
+
+        {cart.length > 0 && (
+          <div className="bg-white rounded-2xl shadow p-4 mb-6">
+            <p className="text-sm font-bold text-green-700 mb-2">🎉 You&apos;ve unlocked FREE delivery</p>
+            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full w-full bg-green-500 rounded-full" />
+            </div>
+          </div>
+        )}
 
         {cart.length === 0 ? (
           <div className="bg-white rounded-3xl shadow p-20 text-center">
@@ -130,10 +194,14 @@ export default function Cart() {
                     {/* Subtotal + Remove */}
                     <div className="text-right flex-shrink-0 ml-2">
                       <p className="font-extrabold text-gray-900">Rs. {(item.price * item.qty).toLocaleString()}</p>
-                      <button onClick={() => removeItem(key)}
-                        className="text-red-400 text-xs hover:text-red-600 hover:underline mt-1 transition">
-                        Remove
-                      </button>
+                      <div className="flex gap-2 justify-end mt-1">
+                        <button onClick={() => saveForLater(key, item.id)} title="Save for later"
+                          className="text-gray-400 text-sm hover:text-red-500 transition">♡</button>
+                        <button onClick={() => removeItem(key)}
+                          className="text-red-400 text-xs hover:text-red-600 hover:underline transition">
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -183,6 +251,32 @@ export default function Cart() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* UPSELL */}
+        {cart.length > 0 && upsell.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-extrabold text-gray-900 mb-4">You may also like 👀</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {upsell.map((p: any) => (
+                <div key={p.id} className="bg-white rounded-2xl shadow p-3">
+                  <Link href={`/products/${p.id}`}>
+                    <div className="h-28 bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center">
+                      {p.image_url || p.image_urls?.[0]
+                        ? <img src={p.image_url || p.image_urls[0]} alt={p.name} className="w-full h-full object-cover" />
+                        : <span className="text-3xl opacity-30">🧺</span>}
+                    </div>
+                    <p className="font-bold text-sm text-gray-800 truncate mt-2">{p.name}</p>
+                    <p className="text-red-700 font-extrabold text-sm">Rs. {(p.sale_price && p.sale_price < p.price ? p.sale_price : p.price)?.toLocaleString()}</p>
+                  </Link>
+                  <button onClick={() => quickAdd(p)}
+                    className="mt-2 w-full bg-red-700 text-white py-1.5 rounded-xl text-xs font-bold hover:bg-red-600 transition">
+                    + Add
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}

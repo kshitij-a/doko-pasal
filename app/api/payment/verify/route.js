@@ -9,6 +9,66 @@ function getServiceClient() {
   return createClient(url, serviceKey)
 }
 
+// Runs once per paid order (verify 409s when already paid, so no double-decrement).
+// Stock failures must never fail payment verification — best-effort only.
+async function settlePaidOrder(supabase, orderId) {
+  try {
+    const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId)
+    for (const it of items || []) {
+      const { data: p } = await supabase.from('products').select('stock').eq('id', it.product_id).single()
+      if (p && p.stock != null) {
+        await supabase.from('products').update({ stock: Math.max(0, p.stock - it.quantity) }).eq('id', it.product_id)
+      }
+    }
+    const { data: ord } = await supabase.from('orders').select('coupon_code').eq('id', orderId).single()
+    if (ord && ord.coupon_code) {
+      const { data: c } = await supabase.from('coupons').select('id, used_count').eq('code', String(ord.coupon_code).toUpperCase()).single()
+      if (c) await supabase.from('coupons').update({ used_count: (c.used_count || 0) + 1 }).eq('id', c.id)
+    }
+  } catch (e) {
+    console.error('settlePaidOrder error:', e)
+  }
+}
+
+async function sendPrepaidReceipt(supabase, req, orderId, method) {
+  try {
+    const { data: fullOrder } = await supabase
+      .from('orders')
+      .select('id, user_id, customer_name, customer_phone, customer_address, total_amount, payment_method')
+      .eq('id', orderId)
+      .single()
+    if (!fullOrder) return
+    const { data: orderItems } = await supabase
+      .from('order_items')
+      .select('product_name, size, quantity, price')
+      .eq('order_id', orderId)
+    if (!orderItems || orderItems.length === 0) return
+    let customerEmail = null
+    try {
+      if (fullOrder.user_id) {
+        const { data } = await supabase.auth.admin.getUserById(fullOrder.user_id)
+        customerEmail = data?.user?.email || null
+      }
+    } catch { return }
+    if (!customerEmail) return
+    const origin = new URL(req.url).origin
+    await fetch(`${origin}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerName: fullOrder.customer_name,
+        customerEmail,
+        customerPhone: fullOrder.customer_phone,
+        orderId: fullOrder.id,
+        items: orderItems,
+        total: Number(fullOrder.total_amount),
+        paymentMethod: method || fullOrder.payment_method,
+        address: fullOrder.customer_address,
+      }),
+    })
+  } catch { /* never fail verification if email fails */ }
+}
+
 export async function POST(req) {
   try {
     const supabase = getServiceClient()
@@ -76,6 +136,9 @@ export async function POST(req) {
           return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
         }
 
+        await settlePaidOrder(supabase, orderId)
+        await sendPrepaidReceipt(supabase, req, orderId, 'khalti')
+
         return NextResponse.json({ success: true, transactionId: result.transaction_id, method: 'khalti' })
       } else {
         return NextResponse.json({ success: false, status: result.status }, { status: 400 })
@@ -125,6 +188,9 @@ export async function POST(req) {
           if (updateError) {
             return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
           }
+
+          await settlePaidOrder(supabase, orderId)
+          await sendPrepaidReceipt(supabase, req, orderId, 'esewa')
 
           return NextResponse.json({ success: true, transactionId: transaction_uuid, method: 'esewa' })
         }

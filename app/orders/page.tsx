@@ -45,7 +45,7 @@ export default function Orders() {
   const statusSteps = ['pending', 'processing', 'shipped', 'delivered']
 
   return (
-    <main className="min-h-screen bg-[#FAF8F4] pb-20 sm:pb-0">
+    <main className="min-h-screen bg-[#FAF8F4] pb-28 sm:pb-0">
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-10">
         {/* Success message */}
