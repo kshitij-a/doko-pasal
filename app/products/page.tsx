@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import Link from 'next/link'
 import Navbar from '../../components/Navbar'
@@ -25,10 +26,10 @@ function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQui
               <img src={images[currentImg]} alt={product.name} className="w-full h-full object-cover" />
               {images.length > 1 && (
                 <>
-                  <button onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i - 1 + images.length) % images.length) }}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-[#1E1A16] w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">‹</button>
-                  <button onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i + 1) % images.length) }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-[#1E1A16] w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">›</button>
+                  <span onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i - 1 + images.length) % images.length) }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-[#1E1A16] w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow cursor-pointer">‹</span>
+                  <span onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i + 1) % images.length) }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-[#1E1A16] w-7 h-7 rounded-full text-sm font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow cursor-pointer">›</span>
                 </>
               )}
             </>
@@ -48,16 +49,16 @@ function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQui
             <span className="absolute bottom-3 right-3 badge-sale text-[10px]">Only {product.stock} left!</span>
           )}
           {/* Wishlist */}
-          <button
+          <span
             onClick={(e) => { e.preventDefault(); onToggleWishlist(product.id) }}
-            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow transition ${inWishlist ? 'bg-[#B5293A] text-white' : 'bg-white/80 hover:bg-white text-[#6B6560]'}`}
+            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow transition cursor-pointer ${inWishlist ? 'bg-[#B5293A] text-white' : 'bg-white/80 hover:bg-white text-[#6B6560]'}`}
           >
             {inWishlist ? (
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
             ) : (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
             )}
-          </button>
+          </span>
         </div>
       </Link>
 
@@ -98,6 +99,15 @@ function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQui
 }
 
 export default function Products() {
+  return (
+    <Suspense fallback={<div className="text-center py-24">Loading products...</div>}>
+      <ProductsInner />
+    </Suspense>
+  )
+}
+
+function ProductsInner() {
+  const searchParams = useSearchParams()
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('All')
@@ -107,7 +117,20 @@ export default function Products() {
   const [toast, setToast] = useState('')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('newest')
+  const [saleOnly, setSaleOnly] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
+
+  useEffect(() => {
+    const c = searchParams.get('category')
+    const s = searchParams.get('sale')
+    const so = searchParams.get('sort')
+    const q = searchParams.get('search')
+    if (c) setCategory(c)
+    if (s === 'true') setSaleOnly(true)
+    if (so) setSort(so)
+    if (q) setSearch(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     fetchProducts()
@@ -152,12 +175,16 @@ export default function Products() {
       return
     }
     const key = `${product.id}-${size}`
+    const price = (product.sale_price && product.sale_price < product.price) ? product.sale_price : product.price
     const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
     let newCart
     if (existing) {
-      newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: i.qty + 1 } : i)
+      let newQty = existing.qty + 1
+      if (product.stock != null) newQty = Math.min(newQty, product.stock)
+      if (newQty <= existing.qty) { setToast('⚠️ Only ' + product.stock + ' in stock!'); setTimeout(() => setToast(''), 2500); return }
+      newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
     } else {
-      newCart = [...cart, { ...product, qty: 1, selectedSize: size }]
+      newCart = [...cart, { ...product, price, qty: 1, selectedSize: size }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
@@ -183,13 +210,17 @@ export default function Products() {
   }
 
   const updateQty = (key: string, qty: number) => {
-    const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty } : i)
+    const clamped = Math.max(1, qty)
+    const target = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+    const finalQty = target?.stock != null ? Math.min(clamped, target.stock) : clamped
+    const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: finalQty } : i)
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
   }
 
   const categories = ['All', "Men's Wear", "Women's Wear", "Kids' Wear"]
   let filtered = category === 'All' ? [...products] : products.filter((p: any) => p.category === category)
+  if (saleOnly) filtered = filtered.filter((p: any) => p.sale_price && p.sale_price < p.price)
   if (search.trim()) {
     filtered = filtered.filter((p: any) =>
       p.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -198,6 +229,8 @@ export default function Products() {
   }
   if (sort === 'price-low') filtered.sort((a: any, b: any) => a.price - b.price)
   else if (sort === 'price-high') filtered.sort((a: any, b: any) => b.price - a.price)
+  else if (sort === 'sale') filtered.sort((a: any, b: any) => ((b.price - (b.sale_price && b.sale_price < b.price ? b.sale_price : b.price)) - (a.price - (a.sale_price && a.sale_price < a.price ? a.sale_price : a.price))))
+  // 'popular' and 'newest' keep default (newest) order
 
   const cartCount = cart.reduce((a: number, i: any) => a + i.qty, 0)
   const wishlistCount = wishlist.length
@@ -236,6 +269,8 @@ export default function Products() {
           <select value={sort} onChange={e => setSort(e.target.value)}
             className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white flex-shrink-0 font-semibold text-[#6B6560] cursor-pointer">
             <option value="newest">Newest</option>
+            <option value="popular">Popular</option>
+            <option value="sale">Sale</option>
             <option value="price-low">Price ↑</option>
             <option value="price-high">Price ↓</option>
           </select>

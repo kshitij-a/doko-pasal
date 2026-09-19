@@ -100,6 +100,8 @@ export default function ProductDetail() {
     setTimeout(() => setToast(''), 2500)
   }
 
+  const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
+
   const addToCart = () => {
     if (product.sizes?.length > 0 && !selectedSize) {
       showToast('⚠️ Please select a size first!')
@@ -107,13 +109,20 @@ export default function ProductDetail() {
     }
     const key = `${product.id}-${selectedSize}`
     const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+    const price = effPrice(product)
     let newCart
     if (existing) {
+      let newQty = existing.qty + quantity
+      if (product.stock != null) newQty = Math.min(newQty, product.stock)
+      if (newQty < existing.qty + quantity) showToast(`⚠️ Only ${product.stock} in stock!`)
       newCart = cart.map((i: any) =>
-        `${i.id}-${i.selectedSize}` === key ? { ...i, qty: i.qty + quantity } : i
+        `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i
       )
     } else {
-      newCart = [...cart, { ...product, qty: quantity, selectedSize }]
+      let qty = quantity
+      if (product.stock != null) qty = Math.min(qty, product.stock)
+      if (qty < quantity) showToast(`⚠️ Only ${product.stock} in stock!`)
+      newCart = [...cart, { ...product, price, qty, selectedSize }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
@@ -140,21 +149,30 @@ export default function ProductDetail() {
 
   const submitReview = async () => {
     if (!user) { showToast('⚠️ Please login to leave a review!'); return }
-    if (!newReview.comment.trim()) { showToast('⚠️ Please write a comment!'); return }
+    const comment = newReview.comment.trim().slice(0, 1000)
+    if (!comment) { showToast('⚠️ Please write a comment!'); return }
+    const rating = Math.min(5, Math.max(1, Number(newReview.rating) || 5))
     setSubmittingReview(true)
-    const { error } = await supabase.from('reviews').insert({
-      product_id: product.id,
-      user_id: user.id,
-      user_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-      rating: newReview.rating,
-      comment: newReview.comment,
-    })
-    if (!error) {
-      showToast('✅ Review submitted!')
-      setNewReview({ rating: 5, comment: '' })
-      loadReviews(product.id)
+    try {
+      const { error } = await supabase.from('reviews').insert({
+        product_id: product.id,
+        user_id: user.id,
+        user_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+        rating,
+        comment,
+      })
+      if (!error) {
+        showToast('✅ Review submitted!')
+        setNewReview({ rating: 5, comment: '' })
+        loadReviews(product.id)
+      } else {
+        showToast('⚠️ Failed to submit review!')
+      }
+    } catch {
+      showToast('⚠️ Failed to submit review!')
+    } finally {
+      setSubmittingReview(false)
     }
-    setSubmittingReview(false)
   }
 
   const avgRating = reviews.length > 0
@@ -275,7 +293,10 @@ export default function ProductDetail() {
             )}
 
             <div className="flex items-baseline gap-3 mb-5">
-              <span className="text-4xl font-extrabold text-red-700">Rs. {product.price?.toLocaleString()}</span>
+              <span className="text-4xl font-extrabold text-red-700">Rs. {effPrice(product)?.toLocaleString()}</span>
+              {product.sale_price && product.sale_price < product.price && (
+                <span className="text-gray-400 line-through text-lg">Rs. {product.price?.toLocaleString()}</span>
+              )}
               <span className="text-green-600 text-sm font-bold bg-green-50 px-2 py-0.5 rounded">Free Delivery</span>
             </div>
 
@@ -444,6 +465,7 @@ export default function ProductDetail() {
                     </div>
                     <textarea value={newReview.comment} onChange={e => setNewReview(r => ({ ...r, comment: e.target.value }))}
                       placeholder="Share your experience..." rows={3}
+                      maxLength={1000}
                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-red-400 resize-none" />
                     <button onClick={submitReview} disabled={submittingReview}
                       className="bg-red-700 text-white px-6 py-3 rounded-xl font-extrabold hover:bg-red-600 transition disabled:opacity-50">
@@ -492,7 +514,7 @@ export default function ProductDetail() {
                     </div>
                     <div className="p-3">
                       <p className="font-bold text-gray-800 text-sm truncate">{item.name}</p>
-                      <p className="text-red-700 font-extrabold mt-1">Rs. {item.price?.toLocaleString()}</p>
+                      <p className="text-red-700 font-extrabold mt-1">Rs. {(item.sale_price && item.sale_price < item.price ? item.sale_price : item.price)?.toLocaleString()}</p>
                     </div>
                   </Link>
                 )
@@ -523,7 +545,10 @@ export default function ProductDetail() {
           localStorage.setItem('cart', JSON.stringify(newCart))
         }}
         onUpdateQty={(key: string, qty: number) => {
-          const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty } : i)
+          const clamped = Math.max(1, qty)
+          const target = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+          const finalQty = target?.stock != null ? Math.min(clamped, target.stock) : clamped
+          const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: finalQty } : i)
           setCart(newCart)
           localStorage.setItem('cart', JSON.stringify(newCart))
         }}

@@ -62,13 +62,22 @@ export default function Wishlist() {
     showToast('💔 Removed from wishlist')
   }
 
+  const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
+
   const addToCart = (product: any) => {
-    const existing = cart.find((i: any) => i.id === product.id)
+    const selectedSize = product.sizes?.[0] || 'Free Size'
+    const key = `${product.id}-${selectedSize}`
+    const price = effPrice(product)
+    const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
     let newCart
     if (existing) {
-      newCart = cart.map((i: any) => i.id === product.id ? { ...i, qty: i.qty + 1 } : i)
+      let newQty = existing.qty + 1
+      if (product.stock != null) newQty = Math.min(newQty, product.stock)
+      if (newQty <= existing.qty) { showToast(`⚠️ Only ${product.stock} in stock!`); return }
+      newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
     } else {
-      newCart = [...cart, { ...product, qty: 1 }]
+      if (product.stock != null && product.stock < 1) { showToast('⚠️ Out of stock!'); return }
+      newCart = [...cart, { ...product, price, qty: 1, selectedSize }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
@@ -76,18 +85,24 @@ export default function Wishlist() {
   }
 
   const addAllToCart = () => {
+    const available = products.filter(p => p.stock == null || p.stock > 0)
     let newCart = [...cart]
-    products.forEach(product => {
-      const existing = newCart.find((i: any) => i.id === product.id)
+    available.forEach(product => {
+      const selectedSize = product.sizes?.[0] || 'Free Size'
+      const key = `${product.id}-${selectedSize}`
+      const price = effPrice(product)
+      const existing = newCart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
       if (existing) {
-        newCart = newCart.map((i: any) => i.id === product.id ? { ...i, qty: i.qty + 1 } : i)
+        let newQty = existing.qty + 1
+        if (product.stock != null) newQty = Math.min(newQty, product.stock)
+        newCart = newCart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
       } else {
-        newCart = [...newCart, { ...product, qty: 1 }]
+        newCart = [...newCart, { ...product, price, qty: 1, selectedSize }]
       }
     })
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
-    showToast(`✅ All ${products.length} items added to cart!`)
+    showToast(`✅ All ${available.length} items added to cart!`)
   }
 
   const clearWishlist = () => {
@@ -228,7 +243,7 @@ export default function Wishlist() {
                     )}
 
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                      <span className="text-xl font-extrabold text-red-700">Rs. {product.price?.toLocaleString()}</span>
+                      <span className="text-xl font-extrabold text-red-700">Rs. {effPrice(product)?.toLocaleString()}</span>
                       <div className="flex gap-2">
                         <button
                           onClick={() => removeFromWishlist(product.id)}

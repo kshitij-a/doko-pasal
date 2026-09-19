@@ -22,17 +22,18 @@ export default function Cart() {
     setUser(data.user)
   }
 
-  const updateQty = (key, delta) => {
-    const updated = cart.map(i =>
-      `${i.id}-${i.selectedSize}` === key
-        ? { ...i, qty: Math.max(1, i.qty + delta) }
-        : i
-    )
+  const updateQty = (key: any, delta: any) => {
+    const updated = cart.map(i => {
+      if (`${i.id}-${i.selectedSize}` !== key) return i
+      const clamped = Math.max(1, i.qty + delta)
+      const finalQty = i.stock != null ? Math.min(clamped, i.stock) : clamped
+      return { ...i, qty: finalQty }
+    })
     setCart(updated)
     localStorage.setItem('cart', JSON.stringify(updated))
   }
 
-  const removeItem = (key) => {
+  const removeItem = (key: any) => {
     const updated = cart.filter(i => `${i.id}-${i.selectedSize}` !== key)
     setCart(updated)
     localStorage.setItem('cart', JSON.stringify(updated))

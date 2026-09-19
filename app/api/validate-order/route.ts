@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export async function POST(request: Request) {
   try {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceKey || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+    }
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, serviceKey)
     const body = await request.json()
     const { orderId, userId } = body
 
@@ -39,6 +39,9 @@ export async function POST(request: Request) {
       }
 
       const validPrice = product.sale_price && product.sale_price < product.price ? product.sale_price : product.price
+      if (product.stock != null && item.quantity > product.stock) {
+        return NextResponse.json({ error: `Insufficient stock for product: ${item.product_id}` }, { status: 400 })
+      }
       serverTotal += validPrice * item.quantity
     }
 
@@ -57,8 +60,8 @@ export async function POST(request: Request) {
       })
     }
 
-    return NextResponse.json({ valid: true, total: serverTotal })
+    return NextResponse.json({ valid: true, total: serverTotal, serverTotal })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Order validation failed' }, { status: 500 })
   }
 }

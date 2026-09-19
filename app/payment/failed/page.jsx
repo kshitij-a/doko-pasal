@@ -15,13 +15,13 @@ function FailedContent() {
       {orderId && (
         <p className="text-gray-400 text-sm mb-6">Order ID: {orderId.slice(0,8).toUpperCase()}</p>
       )}
-      <p className="text-gray-500 mb-8">Your cart items are still saved. You can try again or choose a different payment method.</p>
+      <p className="text-gray-500 mb-8">Your order is still pending and your cart was kept. Retry payment or check your orders.</p>
       <div className="flex gap-3 justify-center">
-        <Link href="/checkout" className="bg-red-700 text-white px-6 py-3 rounded-2xl font-extrabold hover:bg-red-600 transition">
-          Try Again
+        <Link href="/cart" className="bg-red-700 text-white px-6 py-3 rounded-2xl font-extrabold hover:bg-red-600 transition">
+          Back to Cart
         </Link>
-        <Link href="/products" className="bg-gray-200 text-gray-700 px-6 py-3 rounded-2xl font-extrabold hover:bg-gray-300 transition">
-          Keep Shopping
+        <Link href="/orders" className="bg-gray-200 text-gray-700 px-6 py-3 rounded-2xl font-extrabold hover:bg-gray-300 transition">
+          My Orders
         </Link>
       </div>
     </div>

@@ -11,6 +11,9 @@ export default function Home() {
   const [currentBanner, setCurrentBanner] = useState(0)
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
 
+  const safeBannerLink = (url: unknown) =>
+    typeof url === 'string' && (url.startsWith('/') || url.startsWith('http://') || url.startsWith('https://')) ? url : '/products'
+
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser()
@@ -62,7 +65,7 @@ export default function Home() {
           <div className="flex transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
             {banners.map((banner) => (
               <div key={banner.id} className="w-full flex-shrink-0">
-                <a href={banner.link_url || '/products'} className="block relative group">
+                <a href={safeBannerLink(banner.link_url)} className="block relative group">
                   <img src={banner.image_url} alt={banner.title || 'Banner'} className="w-full h-[50vh] sm:h-[65vh] md:h-[80vh] object-cover group-hover:scale-105 transition-transform duration-700" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#1E1A16]/80 via-[#1E1A16]/30 to-transparent" />
                   <div className="absolute bottom-8 sm:bottom-16 left-6 sm:left-16 text-white max-w-lg">

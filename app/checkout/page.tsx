@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -13,6 +13,7 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [step, setStep] = useState(1)
   const [form, setForm] = useState({ name: '', phone: '', address: '', city: '', landmark: '', note: '' })
+  const placingRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -47,9 +48,11 @@ export default function Checkout() {
       alert('Input fields exceed maximum length.'); return
     }
     if (cart.length === 0) { alert('Your cart is empty!'); return }
-
+    if (placingRef.current) return
+    placingRef.current = true
     setLoading(true)
 
+    try {
     const { data: order, error } = await supabase.from('orders').insert({
       user_id: user.id,
       customer_name: form.name,
@@ -64,6 +67,7 @@ export default function Checkout() {
 
     if (error) {
       alert('Error placing order: ' + error.message)
+      placingRef.current = false
       setLoading(false)
       return
     }
@@ -76,42 +80,71 @@ export default function Checkout() {
       quantity: i.qty,
       price: i.price,
     }))
-    await supabase.from('order_items').insert(items)
+    const { error: itemsError } = await supabase.from('order_items').insert(items)
+    if (itemsError) {
+      alert('Error saving order items: ' + itemsError.message)
+      await supabase.from('orders').delete().eq('id', order.id)
+      placingRef.current = false
+      setLoading(false)
+      return
+    }
 
+    let chargeTotal = total
     try {
-      await fetch('/api/validate-order', {
+      const validateRes = await fetch('/api/validate-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: order.id, userId: user.id }),
       })
-    } catch (e) { console.error('Order validation error:', e) }
+      const validation = await validateRes.json()
+      if (!validateRes.ok || validation.valid === false) {
+        alert(validation.message || validation.error || 'Order validation failed. Please review your cart.')
+        placingRef.current = false
+        setLoading(false)
+        return
+      }
+      chargeTotal = validation.serverTotal ?? validation.total ?? total
+    } catch (e) {
+      console.error('Order validation error:', e)
+      alert('Could not validate order. Please try again.')
+      placingRef.current = false
+      setLoading(false)
+      return
+    }
 
     if (paymentMethod === 'khalti') {
+      try {
       const response = await fetch('/api/payment/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'khalti', amount: total, orderId: order.id, productName: 'Doko Pasal Order', customerName: form.name, customerPhone: form.phone, customerEmail: user.email }),
+        body: JSON.stringify({ method: 'khalti', amount: chargeTotal, orderId: order.id, productName: 'Doko Pasal Order', customerName: form.name, customerPhone: form.phone, customerEmail: user.email }),
       })
       const data = await response.json()
-      if (data.paymentUrl) { localStorage.removeItem('cart'); window.location.href = data.paymentUrl }
-      else { alert('Khalti error: ' + (data.error || 'Could not initiate payment')); setLoading(false) }
+      if (data.paymentUrl) { window.location.href = data.paymentUrl; return }
+      else { alert('Khalti error: ' + (data.error || 'Could not initiate payment')) }
+      } catch (e) { console.error('Khalti initiate error:', e); alert('Could not initiate Khalti payment.') }
+      placingRef.current = false
+      setLoading(false)
       return
     }
 
     if (paymentMethod === 'esewa') {
+      try {
       const response = await fetch('/api/payment/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'esewa', amount: total, orderId: order.id, productName: 'Doko Pasal Order' }),
+        body: JSON.stringify({ method: 'esewa', amount: chargeTotal, orderId: order.id, productName: 'Doko Pasal Order' }),
       })
       const data = await response.json()
       if (data.esewaData && data.paymentUrl) {
-        localStorage.removeItem('cart')
         const form_el = document.createElement('form')
         form_el.method = 'POST'; form_el.action = data.paymentUrl
-        Object.entries(data.esewaData).forEach(([key, val]) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = key; input.value = val; form_el.appendChild(input) })
-        document.body.appendChild(form_el); form_el.submit()
-      } else { alert('eSewa error: ' + (data.error || 'Could not initiate payment')); setLoading(false) }
+        Object.entries(data.esewaData).forEach(([key, val]) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = key; input.value = val as string; form_el.appendChild(input) })
+        document.body.appendChild(form_el); form_el.submit(); return
+      } else { alert('eSewa error: ' + (data.error || 'Could not initiate payment')) }
+      } catch (e) { console.error('eSewa initiate error:', e); alert('Could not initiate eSewa payment.') }
+      placingRef.current = false
+      setLoading(false)
       return
     }
 
@@ -127,8 +160,14 @@ export default function Checkout() {
       })
     } catch (e) { console.log('Email error:', e) }
     router.push('/orders?success=true')
-    logActivity('purchase', { total, payment_method: paymentMethod, items: cart.length }, '/checkout')
-    setLoading(false)
+    logActivity('purchase', { total: chargeTotal, payment_method: paymentMethod, items: cart.length }, '/checkout')
+    } catch (e) {
+      console.error('Place order error:', e)
+      alert('Something went wrong placing your order.')
+    } finally {
+      placingRef.current = false
+      setLoading(false)
+    }
   }
 
   const payments = [

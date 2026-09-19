@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import { npDate } from '../../lib/timezone'
 import Link from 'next/link'
 
 export default function ProfilePage() {
@@ -36,17 +37,23 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !user) return
+    if (!file.type.startsWith('image/')) { setError('Only image files allowed'); event.target.value = ''; return }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be <= 5MB'); event.target.value = ''; return }
     setUploading(true)
-    const fileName = `${user.id}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`
-    const { data, error } = await supabase.storage.from('profile-avatars').upload(fileName, file)
-    if (error) {
-      setError('Avatar upload failed: ' + error.message)
+    setError('')
+    try {
+      const fileName = `${user.id}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`
+      const { error } = await supabase.storage.from('profile-avatars').upload(fileName, file)
+      if (error) {
+        setError('Avatar upload failed: ' + error.message)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('profile-avatars').getPublicUrl(fileName)
+      setAvatarUrl(urlData.publicUrl)
+    } finally {
       setUploading(false)
-      return
+      event.target.value = ''
     }
-    const { data: urlData } = supabase.storage.from('profile-avatars').getPublicUrl(fileName)
-    setAvatarUrl(urlData.publicUrl)
-    setUploading(false)
   }
 
   const handleSave = async () => {
@@ -126,7 +133,7 @@ export default function ProfilePage() {
                 <h2 className="text-3xl font-extrabold">Account Details</h2>
                 <p className="text-slate-400">Edit your personal information here.</p>
               </div>
-              <span className="text-sm text-slate-500">Member since {user?.created_at ? (() => { const hasTZ = /[Zz]|[+-]\d{2}(:\d{2})?$/.test(user.created_at.trim()); return new Date(hasTZ ? user.created_at : user.created_at + 'Z').toLocaleDateString('en-US', { timeZone: 'Asia/Kathmandu' }) })() : '—'}</span>
+              <span className="text-sm text-slate-500">Member since {user?.created_at ? npDate(user.created_at) || '—' : '—'}</span>
             </div>
 
             {error && <div className="mb-4 rounded-2xl bg-red-600/10 border border-red-600 text-red-200 px-4 py-3">{error}</div>}

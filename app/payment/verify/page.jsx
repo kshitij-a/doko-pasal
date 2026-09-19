@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -8,8 +8,11 @@ function VerifyContent() {
   const router = useRouter()
   const [status, setStatus] = useState('verifying')
   const [message, setMessage] = useState('')
+  const firedRef = useRef(false)
 
   useEffect(() => {
+    if (firedRef.current) return
+    firedRef.current = true
     verifyPayment()
   }, [])
 
@@ -22,6 +25,16 @@ function VerifyContent() {
     if (!method || !orderId) {
       setStatus('failed')
       setMessage('Invalid payment response.')
+      return
+    }
+    if (method === 'khalti' && !pidx) {
+      setStatus('failed')
+      setMessage('Missing Khalti payment reference. Your cart is kept — try again from /cart.')
+      return
+    }
+    if (method === 'esewa' && !data) {
+      setStatus('failed')
+      setMessage('Missing eSewa payment data. Your cart is kept — try again from /cart.')
       return
     }
 
@@ -37,6 +50,12 @@ function VerifyContent() {
       if (result.success) {
         setStatus('success')
         setMessage(`Payment successful! Transaction ID: ${result.transactionId}`)
+        try { localStorage.removeItem('cart') } catch {}
+        setTimeout(() => router.push('/orders?success=true'), 3000)
+      } else if (response.status === 409) {
+        setStatus('success')
+        setMessage('Payment already verified.')
+        try { localStorage.removeItem('cart') } catch {}
         setTimeout(() => router.push('/orders?success=true'), 3000)
       } else {
         setStatus('failed')

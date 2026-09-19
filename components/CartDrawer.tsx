@@ -69,7 +69,7 @@ export default function CartDrawer({ open, onClose, cart, cartTotal, onRemove, o
                         −
                       </button>
                       <span className="w-7 text-center text-sm font-bold text-[#1E1A16]">{item.qty}</span>
-                      <button onClick={() => onUpdateQty(key, item.qty + 1)}
+                      <button onClick={() => onUpdateQty(key, item.stock != null ? Math.min(item.stock, item.qty + 1) : item.qty + 1)}
                         className="w-8 h-8 flex items-center justify-center text-[#6B6560] hover:text-[#B5293A] font-bold text-sm transition">
                         +
                       </button>

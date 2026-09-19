@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { npTime, npShortDate } from '../../../lib/timezone'
+import { npTime, npShortDate, parseUTC } from '../../../lib/timezone'
 
 const QUICK_REPLIES = [
   { label: 'Thank you!', text: 'Thank you for reaching out! How can we help you?' },
@@ -114,23 +114,17 @@ export default function AdminMessages() {
     setMessages([])
   }
 
-  const parseTimestamp = (v: string | null | undefined) => {
-    if (!v) return null
-    const hasTZ = /[Zz]|[+-]\d{2}(:\d{2})?$/.test(v.trim())
-    const d = new Date(hasTZ ? v : v + 'Z')
-    return isNaN(d.getTime()) ? null : d
-  }
-
   const timeAgo = (date: string | null | undefined) => {
-    const dt = parseTimestamp(date)
-    if (!dt) return ''
+    if (!date) return ''
+    const dt = parseUTC(date)
+    if (isNaN(dt.getTime())) return ''
     const diff = Date.now() - dt.getTime()
     const mins = Math.floor(diff / 60000)
     if (mins < 1) return 'now'
     if (mins < 60) return `${mins}m`
     const hrs = Math.floor(mins / 60)
     if (hrs < 24) return `${hrs}h`
-    return dt.toLocaleDateString('en-US', { timeZone: 'Asia/Kathmandu', month: 'short', day: 'numeric' })
+    return npShortDate(date)
   }
 
   const sendReply = async (content: string, mediaUrl?: string, mediaType?: string) => {
@@ -274,7 +268,7 @@ export default function AdminMessages() {
                         font: '400 13px var(--admin-font-ui)', lineHeight: 1.5,
                       }}>
                         {msg.media_url && msg.media_type === 'image' && (
-                          <img src={msg.media_url} alt="" style={{ borderRadius: 8, maxWidth: '100%', maxHeight: 180, objectFit: 'cover', marginBottom: msg.content ? 8 : 0, cursor: 'pointer' }} onClick={() => window.open(msg.media_url, '_blank')} />
+                          <img src={msg.media_url} alt="" style={{ borderRadius: 8, maxWidth: '100%', maxHeight: 180, objectFit: 'cover', marginBottom: msg.content ? 8 : 0, cursor: 'pointer' }} onClick={() => { if (typeof msg.media_url === 'string' && /^https?:\/\//.test(msg.media_url)) window.open(msg.media_url, '_blank', 'noopener,noreferrer') }} />
                         )}
                         {msg.media_url && msg.media_type === 'video' && (
                           <video src={msg.media_url} controls style={{ borderRadius: 8, maxWidth: '100%', maxHeight: 180, marginBottom: msg.content ? 8 : 0 }} />

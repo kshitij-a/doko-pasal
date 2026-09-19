@@ -15,6 +15,9 @@ export default function ForgotPassword() {
     setError('')
     setMessage('')
 
+    // Prefer configured base URL so the reset link can't be pointed at an
+    // attacker host via Host-header tricks; window.location.origin is fallback.
+    // NOTE: add server-side rate limiting on reset requests if abuse is seen.
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${baseUrl}/auth/reset-password`,

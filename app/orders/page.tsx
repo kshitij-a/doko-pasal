@@ -9,6 +9,7 @@ import Navbar from '../../components/Navbar'
 export default function Orders() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
@@ -21,22 +22,23 @@ export default function Orders() {
     fetchOrders(data.user.id)
   }
 
-  const fetchOrders = async (userId) => {
+  const fetchOrders = async (userId: string) => {
     try {
+      setError('')
       const { data, error } = await supabase.from('orders').select('*, order_items(*)').eq('user_id', userId).order('created_at', { ascending: false })
-      if (error) console.error('Error fetching orders:', error.message)
+      if (error) setError('Could not load your orders: ' + error.message)
       else if (data) setOrders(data)
-    } catch (err) { console.error('Failed to fetch orders:', err) }
+    } catch (err) { setError('Could not load your orders. Please try again.') }
     finally { setLoading(false) }
   }
 
-  const statusBadge = (status) => {
-    const map = { pending: 'badge-pending', processing: 'badge-processing', shipped: 'badge-shipped', delivered: 'badge-delivered', cancelled: 'badge-cancelled' }
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = { pending: 'badge-pending', processing: 'badge-processing', shipped: 'badge-shipped', delivered: 'badge-delivered', cancelled: 'badge-cancelled' }
     return map[status] || 'badge-pending'
   }
 
-  const paymentLabel = (method) => {
-    const map = { khalti: 'Khalti', esewa: 'eSewa', cod: 'Cash on Delivery', bank: 'Bank Transfer' }
+  const paymentLabel = (method: string) => {
+    const map: Record<string, string> = { khalti: 'Khalti', esewa: 'eSewa', cod: 'Cash on Delivery', bank: 'Bank Transfer' }
     return map[method] || method
   }
 
@@ -47,17 +49,32 @@ export default function Orders() {
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-10">
         {/* Success message */}
-        {typeof window !== 'undefined' && window.location.search.includes('success=true') && (
+        {typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('success') === 'true' && (
           <div className="bg-white border border-[#E8E3DB] rounded-2xl p-8 mb-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#D1FAE5] flex items-center justify-center">
               <svg className="w-8 h-8 text-[#2A7D4F]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
-            <h2 className="text-2xl font-bold text-[#1E1A16] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Order Placed Successfully!</h2>
-            <p className="text-[#6B6560] mb-6">Thank you for shopping at Doko Pasal. We will contact you soon!</p>
+            {new URLSearchParams(window.location.search).get('payment') === 'pending' ? (
+              <>
+                <h2 className="text-2xl font-bold text-[#1E1A16] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Order Received — Payment Pending</h2>
+                <p className="text-[#6B6560] mb-6">Your order is placed. Please complete your eSewa/Khalti payment or keep cash ready for COD.</p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold text-[#1E1A16] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Order Placed Successfully!</h2>
+                <p className="text-[#6B6560] mb-6">Payment confirmed. Thank you for shopping at Doko Pasal. We will contact you soon!</p>
+              </>
+            )}
             <div className="flex justify-center gap-3">
               <Link href="/orders" className="btn-primary text-sm">View My Orders</Link>
               <Link href="/products" className="btn-secondary text-sm">Shop More</Link>
             </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-[#FDECEC] border border-[#F5C2C2] text-[#9A2231] rounded-2xl px-5 py-4 mb-6 text-sm font-semibold" role="alert">
+            {error}
           </div>
         )}
 
@@ -118,7 +135,7 @@ export default function Orders() {
 
                   {/* Order Items */}
                   <div className="space-y-2 mb-4">
-                    {order.order_items?.map(item => (
+                    {order.order_items?.map((item: any) => (
                       <div key={item.id} className="flex justify-between items-center py-2 border-b border-[#F0EBE3] last:border-0">
                         <div>
                           <p className="font-semibold text-sm text-[#1E1A16]">{item.product_name}</p>

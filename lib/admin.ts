@@ -1,26 +1,20 @@
 import { supabase } from './supabase'
 
-let adminCache: { email: string; isAdmin: boolean } | null = null
-
+// NOTE: no cache on purpose — always fetch fresh so a logout/login as a
+// different user can never reuse the previous user's admin flag.
 export async function checkAdminAccess(): Promise<{ isAdmin: boolean; email: string }> {
-  if (adminCache) return adminCache
-
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) {
-    adminCache = { email: '', isAdmin: false }
-    return adminCache
+    return { email: '', isAdmin: false }
   }
 
   const { data: adminData } = await supabase.from('admins').select('email').eq('email', userData.user.email).single()
 
-  adminCache = {
+  return {
     email: userData.user.email || '',
     isAdmin: !!adminData,
   }
-
-  return adminCache
 }
 
-export function clearAdminCache() {
-  adminCache = null
-}
+// Kept as no-op for backwards compat with existing callers.
+export function clearAdminCache() {}

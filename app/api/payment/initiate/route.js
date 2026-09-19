@@ -1,6 +1,7 @@
 // File location: app/api/payment/initiate/route.js
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { createClient } from '@supabase/supabase-js'
 
 // eSewa signature generator
 function generateEsewaSignature(secretKey, message) {
@@ -8,8 +9,18 @@ function generateEsewaSignature(secretKey, message) {
   return hash
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function POST(req) {
   try {
+    // validatePaymentEnv inline: service key + supabase url required
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!serviceKey || !supabaseUrl) {
+      return NextResponse.json({ error: 'Payment service misconfigured' }, { status: 500 })
+    }
+    const supabase = createClient(supabaseUrl, serviceKey)
+
     const body = await req.json()
     const { amount, orderId, productName, method } = body
 
@@ -17,15 +28,41 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    if (!UUID_RE.test(orderId)) {
+      return NextResponse.json({ error: 'Invalid orderId format' }, { status: 400 })
+    }
+
+    const amountNum = Number(amount)
+    const amountInPaisa = Math.round(amountNum * 100)
+    if (!Number.isFinite(amountNum) || amountNum <= 0 || !Number.isInteger(amountInPaisa) || amountInPaisa <= 0) {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+    }
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('id, total_amount')
+      .eq('id', orderId)
+      .single()
+
+    if (orderError || !order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (Math.abs(amountNum - Number(order.total_amount)) > 0.01) {
+      return NextResponse.json({ error: 'Amount mismatch' }, { status: 400 })
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
     // ====== KHALTI PAYMENT ======
     if (method === 'khalti') {
       const khaltiSecretKey = process.env.KHALTI_SECRET_KEY
-      const amountInPaisa = Math.round(amount * 100) // Convert Rs to paisa
+      if (!khaltiSecretKey) {
+        return NextResponse.json({ error: 'Khalti payment is not configured' }, { status: 500 })
+      }
 
       const payload = {
-        return_url: `${baseUrl}/payment/verify?method=khalti&orderId=${orderId}`,
+        return_url: `${baseUrl}/payment/verify?method=khalti&orderId=${encodeURIComponent(orderId)}`,
         website_url: baseUrl,
         amount: amountInPaisa,
         purchase_order_id: orderId,
@@ -62,34 +99,35 @@ export async function POST(req) {
       if (!merchantCode || !secretKey) {
         return NextResponse.json({ error: 'eSewa payment is not configured' }, { status: 500 })
       }
+      const esewaFormUrl = process.env.ESEWA_FORM_URL || 'https://rc-epay.esewa.com.np/api/epay/main/v2/form'
       const transactionUuid = `${orderId}-${Date.now()}`
 
-      const message = `total_amount=${amount},transaction_uuid=${transactionUuid},product_code=${merchantCode}`
+      const message = `total_amount=${amountNum},transaction_uuid=${transactionUuid},product_code=${merchantCode}`
       const signature = generateEsewaSignature(secretKey, message)
 
       const esewaData = {
-        amount: amount,
+        amount: amountNum,
         tax_amount: 0,
-        total_amount: amount,
+        total_amount: amountNum,
         transaction_uuid: transactionUuid,
         product_code: merchantCode,
         product_service_charge: 0,
         product_delivery_charge: 0,
-        success_url: `${baseUrl}/payment/verify?method=esewa&orderId=${orderId}`,
-        failure_url: `${baseUrl}/payment/failed?orderId=${orderId}`,
+        success_url: `${baseUrl}/payment/verify?method=esewa&orderId=${encodeURIComponent(orderId)}`,
+        failure_url: `${baseUrl}/payment/failed?orderId=${encodeURIComponent(orderId)}`,
         signed_field_names: 'total_amount,transaction_uuid,product_code',
         signature: signature,
       }
 
       return NextResponse.json({
         esewaData,
-        paymentUrl: 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
+        paymentUrl: esewaFormUrl,
       })
     }
 
     return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
   } catch (error) {
     console.error('Payment initiation error:', error)
-    return NextResponse.json({ error: 'Server error: ' + error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Payment initiation failed' }, { status: 500 })
   }
 }

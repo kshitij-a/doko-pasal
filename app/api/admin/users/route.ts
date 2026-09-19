@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { verifyAdminAccess, getSupabaseAdmin } from '../../../../lib/admin-api'
 
 function getAdminClient() {
@@ -20,6 +19,9 @@ export async function GET(request: Request) {
 
     let users: any[] = []
     const supabaseAdmin = getAdminClient()
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    }
 
     if (supabaseAdmin) {
       const { data: authData, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
@@ -29,11 +31,7 @@ export async function GET(request: Request) {
     }
 
     if (users.length === 0) {
-      const fallbackClient = supabaseAdmin || createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data: activityUsers } = await fallbackClient
+      const { data: activityUsers } = await supabaseAdmin
         .from('activity_logs')
         .select('user_id, user_email, user_name')
         .not('user_id', 'is', null)
@@ -70,11 +68,7 @@ export async function GET(request: Request) {
     const userIds = filtered.map(u => u.id).filter(Boolean)
     let orderData: any[] = []
     if (userIds.length > 0) {
-      const client = supabaseAdmin || createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data } = await client
+      const { data } = await supabaseAdmin
         .from('orders')
         .select('user_id, total_amount, order_status')
         .in('user_id', userIds)
@@ -104,11 +98,7 @@ export async function GET(request: Request) {
 
     const ordersForUserId = searchParams.get('ordersForUser')
     if (ordersForUserId) {
-      const client = supabaseAdmin || createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      const { data: orders } = await client
+      const { data: orders } = await supabaseAdmin
         .from('orders')
         .select('*, order_items(*)')
         .eq('user_id', ordersForUserId)
@@ -187,7 +177,7 @@ export async function POST(request: Request) {
       const { data, error } = await client.auth.admin.generateLink({
         email,
         type: 'magiclink',
-        redirectTo: baseUrl,
+        options: { redirectTo: baseUrl },
       })
       if (error) throw error
       const actionLink = data?.properties?.action_link
@@ -216,7 +206,7 @@ export async function POST(request: Request) {
       const { data, error } = await client.auth.admin.generateLink({
         email,
         type: 'recovery',
-        redirectTo: `${baseUrl}/auth/reset-password`,
+        options: { redirectTo: `${baseUrl}/auth/reset-password` },
       })
       if (error) throw error
       const actionLink = data?.properties?.action_link

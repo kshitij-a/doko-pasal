@@ -3,7 +3,8 @@ import { verifyAdminAccess } from '../../../../lib/admin-api'
 import { createClient } from '@supabase/supabase-js'
 
 function getClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!key) return null
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key)
 }
 
@@ -12,6 +13,8 @@ export async function GET(request: Request) {
   if (!authorized) return response!
 
   try {
+    const supabase = getClient()
+    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
     const action = searchParams.get('action') || ''
@@ -19,7 +22,6 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
 
-    const supabase = getClient()
     let query = supabase.from('activity_logs').select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -41,12 +43,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { authorized, response } = await verifyAdminAccess(request)
+  if (!authorized) return response!
+
   try {
     const body = await request.json()
     if (!body.action) {
       return NextResponse.json({ error: 'action is required' }, { status: 400 })
     }
     const supabase = getClient()
+    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
     const { error } = await supabase.from('activity_logs').insert({
       user_id: body.user_id || null,
       user_email: body.user_email || null,

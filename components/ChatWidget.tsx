@@ -3,6 +3,14 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { npTime } from '../lib/timezone'
 
+const safeMediaUrl = (url: unknown) =>
+  typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://')) ? url : null
+
+const openMedia = (url: unknown) => {
+  const safe = safeMediaUrl(url)
+  if (safe) window.open(safe, '_blank', 'noopener,noreferrer')
+}
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
@@ -217,7 +225,7 @@ export default function ChatWidget() {
                     {msg.media_url && msg.media_type === 'image' && (
                       <img src={msg.media_url} alt="Shared image"
                         className="rounded-xl mb-2 max-w-full cursor-pointer hover:opacity-90 transition"
-                        onClick={() => window.open(msg.media_url, '_blank')} />
+                        onClick={() => openMedia(msg.media_url)} />
                     )}
                     {msg.media_url && msg.media_type === 'video' && (
                       <video src={msg.media_url} controls className="rounded-xl mb-2 max-w-full" />

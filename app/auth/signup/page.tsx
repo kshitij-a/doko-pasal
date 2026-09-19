@@ -20,6 +20,27 @@ export default function SignUp() {
     setError('')
     setMessage('')
 
+    if (!name.trim() || !email.trim() || !password) {
+      setError('Please fill in name, email and password')
+      setLoading(false)
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter a valid email address')
+      setLoading(false)
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      setLoading(false)
+      return
+    }
+    if (phone && !/^[+\d][\d\s-]{6,15}$/.test(phone.trim())) {
+      setError('Please enter a valid phone number')
+      setLoading(false)
+      return
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,

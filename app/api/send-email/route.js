@@ -16,6 +16,13 @@ export async function POST(req) {
     const body = await req.json()
     const { customerName, customerEmail, customerPhone, orderId, items, total, paymentMethod, address } = body
 
+    // Validation (auth-optional; total validated upstream at checkout, accepted here after basic checks)
+    const emailOk = typeof customerEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)
+    if (!emailOk) return NextResponse.json({ error: 'Valid customerEmail required' }, { status: 400 })
+    if (typeof orderId !== 'string' || !orderId.trim()) return NextResponse.json({ error: 'orderId required' }, { status: 400 })
+    if (!Array.isArray(items) || items.length === 0) return NextResponse.json({ error: 'items non-empty array required' }, { status: 400 })
+    if (typeof total !== 'number' || !(total > 0)) return NextResponse.json({ error: 'total must be a number > 0' }, { status: 400 })
+
     const RESEND_API_KEY = process.env.RESEND_API_KEY
 
     if (!RESEND_API_KEY) {
@@ -30,10 +37,10 @@ export async function POST(req) {
           ${item.size ? `<span style="color: #9ca3af; font-size: 12px;"> (Size: ${escapeHtml(item.size)})</span>` : ''}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151; text-align: center;">
-          ${item.quantity}
+          ${escapeHtml(String(item.quantity))}
         </td>
         <td style="padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #b91c1c; font-weight: bold; text-align: right;">
-          Rs. ${(item.price * item.quantity).toLocaleString()}
+          Rs. ${Number(item.price * item.quantity).toLocaleString()}
         </td>
       </tr>
     `).join('')
@@ -126,7 +133,7 @@ export async function POST(req) {
         </div>
         <div style="background: #f9fafb; border-radius: 12px; padding: 16px;">
           <p style="margin: 0 0 8px; font-size: 12px; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">💳 Payment</p>
-          <p style="margin: 0; font-weight: 600; color: #111827; font-size: 14px;">${paymentLabels[paymentMethod] || paymentMethod}</p>
+          <p style="margin: 0; font-weight: 600; color: #111827; font-size: 14px;">${escapeHtml(String(paymentLabels[paymentMethod] || paymentMethod || ''))}</p>
           <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">🚚 Free delivery</p>
           <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">⏱️ 2-5 business days</p>
         </div>
