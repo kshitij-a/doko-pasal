@@ -15,15 +15,22 @@ async function settlePaidOrder(supabase, orderId) {
   try {
     const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId)
     for (const it of items || []) {
-      const { data: p } = await supabase.from('products').select('stock').eq('id', it.product_id).single()
-      if (p && p.stock != null) {
-        await supabase.from('products').update({ stock: Math.max(0, p.stock - it.quantity) }).eq('id', it.product_id)
+      try {
+        const { data: ok, error: stockError } = await supabase.rpc('decrement_stock', { p_product: it.product_id, p_qty: it.quantity })
+        if (stockError) console.error('decrement_stock error:', stockError, it.product_id)
+        else if (ok === false) console.error('decrement_stock insufficient stock:', it.product_id)
+      } catch (e) {
+        console.error('decrement_stock error:', e)
       }
     }
     const { data: ord } = await supabase.from('orders').select('coupon_code').eq('id', orderId).single()
     if (ord && ord.coupon_code) {
-      const { data: c } = await supabase.from('coupons').select('id, used_count').eq('code', String(ord.coupon_code).toUpperCase()).single()
-      if (c) await supabase.from('coupons').update({ used_count: (c.used_count || 0) + 1 }).eq('id', c.id)
+      const code = String(ord.coupon_code).toUpperCase()
+      const { error: redeemError } = await supabase.from('coupon_redemptions').insert({ coupon_code: code, order_id: orderId })
+      if (!redeemError) {
+        const { data: c } = await supabase.from('coupons').select('id, used_count').eq('code', code).single()
+        if (c) await supabase.from('coupons').update({ used_count: (c.used_count || 0) + 1 }).eq('id', c.id)
+      }
     }
   } catch (e) {
     console.error('settlePaidOrder error:', e)

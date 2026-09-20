@@ -80,10 +80,15 @@ export async function POST(request: Request) {
       })
     }
 
-    // ponytail: used_count increments once per order — COD/bank path passes finalize:true a
-    // single time; prepaid increments in verify's settlePaidOrder. Repeat calls double-count.
+    // FIX-05: idempotent coupon use via coupon_redemptions (order_id UNIQUE).
+    // Only the first finalize for an order inserts + increments; duplicates are already-counted.
     if (finalize === true && coupon) {
-      await supabase.from('coupons').update({ used_count: (coupon.used_count || 0) + 1 }).eq('id', coupon.id)
+      const { error: redeemError } = await supabase
+        .from('coupon_redemptions')
+        .insert({ coupon_code: coupon.code, order_id: orderId })
+      if (!redeemError) {
+        await supabase.from('coupons').update({ used_count: (coupon.used_count || 0) + 1 }).eq('id', coupon.id)
+      }
     }
 
     return NextResponse.json({ valid: true, total: serverTotal, serverTotal, discount, couponCode: coupon?.code || null })

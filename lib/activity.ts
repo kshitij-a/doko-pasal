@@ -5,7 +5,7 @@ export async function logActivity(action: string, details?: Record<string, any>,
     const { data: userData } = await supabase.auth.getUser()
     const user = userData?.user
 
-    await fetch('/api/admin/activity', {
+    await fetch('/api/activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -114,9 +114,10 @@ export default function ProductDetail() {
 
   const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
 
-  const addToCart = () => {
+  const addToCart = (silent = false) => {
     if (product.sizes?.length > 0 && !selectedSize) {
       showToast('⚠️ Please select a size first!')
+      document.getElementById('size-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
     const key = `${product.id}-${selectedSize}`
@@ -138,16 +139,17 @@ export default function ProductDetail() {
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
-    showToast(`✅ "${product.name}" added to cart!`)
+    if (!silent) showToast(`✅ "${product.name}" added to cart!`)
   }
 
   const buyNow = () => {
     if (product.sizes?.length > 0 && !selectedSize) {
       showToast('⚠️ Please select a size first!')
+      document.getElementById('size-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-    addToCart()
-    router.push('/cart')
+    addToCart(true)
+    setTimeout(() => router.push('/cart'), 400)
   }
 
   const toggleWishlist = () => {
@@ -223,7 +225,7 @@ export default function ProductDetail() {
     <main className="min-h-screen bg-white pb-16 sm:pb-0">
       {/* TOAST */}
       {toast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
           {toast}
         </div>
       )}
@@ -322,7 +324,7 @@ export default function ProductDetail() {
             )}
 
             {product.sizes && product.sizes.length > 0 && (
-              <div className="mb-5">
+              <div id="size-row" className="mb-5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-bold text-gray-800">Select Size:</p>
                   <button onClick={() => setShowSizeGuide(true)} className="text-xs font-bold text-red-700 hover:underline">Size Guide</button>
@@ -340,7 +342,7 @@ export default function ProductDetail() {
                   ))}
                 </div>
                 {showSizeGuide && (
-                  <dialog open className="fixed inset-0 z-[210] m-auto bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-sm">
+                  <dialog open onCancel={() => setShowSizeGuide(false)} onClick={(e) => { if (e.target === e.currentTarget) setShowSizeGuide(false) }} className="fixed inset-0 z-[210] m-auto bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-sm">
                     <p className="font-extrabold text-gray-900 mb-3">Size Guide (in)</p>
                     <table className="w-full text-sm text-gray-700 mb-4">
                       <thead><tr className="text-left text-gray-400 text-xs"><th className="py-1">Size</th><th>Chest</th><th>Length</th></tr></thead>
@@ -370,7 +372,7 @@ export default function ProductDetail() {
             </div>
 
             <div className="flex gap-3 mb-4">
-              <button onClick={addToCart} disabled={product.stock === 0}
+              <button onClick={() => addToCart()} disabled={product.stock === 0}
                 className="flex-1 bg-white border-2 border-red-700 text-red-700 py-4 rounded-2xl font-extrabold text-lg hover:bg-red-50 transition disabled:opacity-50">
                 🛒 Add to Cart
               </button>
@@ -621,7 +623,7 @@ export default function ProductDetail() {
 
       {/* STICKY MOBILE ATC BAR */}
       <div className="fixed bottom-0 left-0 right-0 z-[110] md:hidden bg-white border-t border-gray-200 px-4 py-2.5 flex gap-2 safe-area-bottom">
-        <button onClick={addToCart} disabled={product.stock === 0}
+        <button onClick={() => addToCart()} disabled={product.stock === 0}
           className="flex-1 border-2 border-red-700 text-red-700 py-3 rounded-2xl font-extrabold hover:bg-red-50 transition disabled:opacity-50">
           🛒 Add
         </button>

@@ -106,7 +106,7 @@ export default function Home() {
           {banners.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
               {banners.map((_, i) => (
-                <button key={i} onClick={() => setCurrentBanner(i)}
+                <button key={i} onClick={() => setCurrentBanner(i)} aria-label={`Go to slide ${i + 1}`}
                   className={`h-1.5 rounded-full transition-all ${i === currentBanner ? 'w-8 bg-white' : 'w-1.5 bg-white/40'}`} />
               ))}
             </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { check, getIp } from '../../../lib/rate-limit'
 
 function escapeHtml(str: unknown) {
   if (!str) return ''
@@ -13,6 +14,9 @@ function escapeHtml(str: unknown) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(req: Request) {
+  if (!check(getIp(req), 5, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
   try {
     const body = await req.json()
     const name = typeof body.name === 'string' ? body.name.trim() : ''

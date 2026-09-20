@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import { deliveryProgress } from '../../lib/delivery'
 
 export default function Cart() {
   const [cart, setCart] = useState<any[]>([])
@@ -37,8 +38,13 @@ export default function Cart() {
     } catch (e) { console.error('Failed to fetch upsell:', e) }
   }
 
-  const quickAdd = (product: any) => {
-    const selectedSize = product.sizes?.[0] || 'Free Size'
+  const quickAdd = (product: any, chosenSize?: string) => {
+    if (product.sizes?.length && !chosenSize) {
+      showToast('Please choose a size')
+      return
+    }
+    const selectedSize = chosenSize ?? product.sizes?.[0] ?? 'Free Size'
+    const effectivePrice = product.sale_price && product.sale_price < product.price ? product.sale_price : product.price
     const key = `${product.id}-${selectedSize}`
     const existing = cart.find(i => `${i.id}-${i.selectedSize}` === key)
     let updated
@@ -47,7 +53,7 @@ export default function Cart() {
       if (product.stock != null) newQty = Math.min(newQty, product.stock)
       updated = cart.map(i => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty } : i)
     } else {
-      updated = [...cart, { ...product, qty: 1, selectedSize }]
+      updated = [...cart, { ...product, price: effectivePrice, qty: 1, selectedSize }]
     }
     setCart(updated)
     localStorage.setItem('cart', JSON.stringify(updated))
@@ -110,7 +116,7 @@ export default function Cart() {
     <main className="min-h-screen bg-gray-50 pb-28 sm:pb-0">
       {/* TOAST */}
       {toast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
           {toast}
         </div>
       )}
@@ -132,14 +138,17 @@ export default function Cart() {
           )}
         </div>
 
-        {cart.length > 0 && (
+        {cart.length > 0 && (() => {
+          const { widthPct } = deliveryProgress(total)
+          return (
           <div className="bg-white rounded-2xl shadow p-4 mb-6">
-            <p className="text-sm font-bold text-green-700 mb-2">🎉 You&apos;ve unlocked FREE delivery</p>
+            <p className="text-sm font-bold text-green-700 mb-2">🎉 You&apos;ve unlocked FREE delivery — FREE delivery on all orders</p>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full w-full bg-green-500 rounded-full" />
+              <div className="h-full bg-green-500 rounded-full" style={{ width: `${widthPct}%` }} />
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {cart.length === 0 ? (
           <div className="bg-white rounded-3xl shadow p-20 text-center">

@@ -39,9 +39,10 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
     }
     readCounts()
     window.addEventListener('storage', readCounts)
+    window.addEventListener('focus', readCounts)
     const handleScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handleScroll)
-    return () => { window.removeEventListener('scroll', handleScroll); window.removeEventListener('storage', readCounts) }
+    return () => { window.removeEventListener('scroll', handleScroll); window.removeEventListener('storage', readCounts); window.removeEventListener('focus', readCounts) }
   }, [])
 
   useEffect(() => {
@@ -108,7 +109,7 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
     <header className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#1E1A16]/95 backdrop-blur-md shadow-lg' : 'bg-[#1E1A16]'}`}>
       {/* Announcement Bar */}
       <div className="bg-[#C9963A] text-[#1E1A16] text-center py-1.5 px-4">
-        <p className="text-xs sm:text-sm font-semibold">Free delivery on orders above Rs. 2,000 · Easy returns within 7 days</p>
+        <p className="text-xs sm:text-sm font-semibold">Free delivery on all orders · Easy returns within 7 days</p>
       </div>
 
       {/* Main Nav */}

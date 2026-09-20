@@ -169,7 +169,7 @@ export default function ChatWidget() {
   }
 
   if (!user) return (
-    <div className="fixed bottom-24 sm:bottom-6 right-6 z-[999]">
+    <div className="fixed bottom-[136px] sm:bottom-6 right-6 z-[999]">
       <a href="/auth/login"
         className="flex items-center gap-2 bg-red-700 text-white px-5 py-3 rounded-full shadow-2xl font-bold hover:bg-red-600 transition">
         💬 Chat with us
@@ -178,10 +178,10 @@ export default function ChatWidget() {
   )
 
   return (
-    <div className="fixed bottom-24 sm:bottom-6 right-6 z-[999]">
+    <div className="fixed bottom-[136px] sm:bottom-6 right-6 z-[999]">
       {/* CHAT WINDOW */}
       {open && (
-        <div className="absolute bottom-16 right-0 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
+        <div className="absolute bottom-16 right-0 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 max-h-[70vh] sm:max-h-none"
           style={{ height: '520px', display: 'flex', flexDirection: 'column' }}>
 
           {/* HEADER */}

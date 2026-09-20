@@ -124,14 +124,20 @@ export default function Checkout() {
       const validation = await validateRes.json()
       if (!validateRes.ok || validation.valid === false) {
         alert(validation.message || validation.error || 'Order validation failed. Please review your cart.')
+        await supabase.from('orders').delete().eq('id', order.id)
         placingRef.current = false
         setLoading(false)
         return
       }
       chargeTotal = validation.serverTotal ?? validation.total ?? total
+      const serverTotal = validation.serverTotal ?? validation.total
+      if (serverTotal != null && Math.abs(serverTotal - order.total_amount) > 0.01) {
+        await supabase.from('orders').update({ total_amount: serverTotal }).eq('id', order.id)
+      }
     } catch (e) {
       console.error('Order validation error:', e)
       alert('Could not validate order. Please try again.')
+      await supabase.from('orders').delete().eq('id', order.id)
       placingRef.current = false
       setLoading(false)
       return
@@ -178,7 +184,10 @@ export default function Checkout() {
       try {
         await fetch('/api/decrement-stock', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}`,
+          },
           body: JSON.stringify({ orderId: order.id }),
         })
       } catch (e) { console.log('Stock decrement error:', e) }
@@ -189,7 +198,7 @@ export default function Checkout() {
     try {
       await fetch('/api/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}` },
         body: JSON.stringify({ customerName: form.name, customerEmail: user.email, customerPhone: form.phone, orderId: order.id, items, total: payableTotal, paymentMethod, address: `${form.address}, ${form.city}` }),
       })
     } catch (e) { console.log('Email error:', e) }

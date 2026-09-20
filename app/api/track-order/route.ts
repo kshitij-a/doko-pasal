@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { check, getIp } from '../../../lib/rate-limit'
 
 export async function POST(request: Request) {
+  if (!check(getIp(request), 20, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
   try {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!serviceKey || !process.env.NEXT_PUBLIC_SUPABASE_URL) {

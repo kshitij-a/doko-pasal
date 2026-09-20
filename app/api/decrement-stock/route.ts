@@ -12,8 +12,25 @@ export async function POST(request: Request) {
   const supabase = createClient(url, key)
 
   try {
+    // Require Authorization Bearer + verify caller owns the order
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized - no Bearer token provided' }, { status: 401 })
+    }
+    const token = authHeader.replace('Bearer ', '')
+    const anon = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const { data: { user }, error: authError } = await anon.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
+
     const { orderId } = await request.json()
     if (!orderId) return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })
+
+    const { data: order } = await supabase.from('orders').select('user_id').eq('id', orderId).single()
+    if (!order || order.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden - order does not belong to caller' }, { status: 403 })
+    }
 
     const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId)
     for (const it of items || []) {

@@ -25,13 +25,19 @@ export default function MobileBottomBar({ cartCount = 0, cartTotal = 0, onCartOp
     }
     read()
     window.addEventListener('storage', read)
-    return () => window.removeEventListener('storage', read)
+    window.addEventListener('focus', read)
+    document.addEventListener('visibilitychange', read)
+    return () => {
+      window.removeEventListener('storage', read)
+      window.removeEventListener('focus', read)
+      document.removeEventListener('visibilitychange', read)
+    }
   }, [pathname])
   const count = cartCount || local.count
   const total = cartTotal || local.total
   const handleCartOpen = onCartOpen || (() => router.push('/cart'))
 
-  if (pathname?.startsWith('/admin') || pathname?.startsWith('/checkout')) return null
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/checkout') || pathname?.startsWith('/cart') || pathname?.startsWith('/auth')) return null
 
   const items = [
     { href: '/', label: 'Home', icon: (
