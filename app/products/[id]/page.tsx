@@ -316,7 +316,7 @@ export default function ProductDetail() {
                   </span>
                 </>
               )}
-              <span className="text-green-600 text-sm font-bold bg-green-50 px-2 py-0.5 rounded">Free Delivery</span>
+              <span className="text-green-600 text-sm font-bold bg-green-50 px-2 py-0.5 rounded">Delivery on contact</span>
             </div>
 
             {product.description && (
@@ -389,7 +389,7 @@ export default function ProductDetail() {
 
             <div className="bg-gray-50 rounded-2xl p-5 space-y-3">
               {[
-                { icon: '🚚', title: 'Free Delivery', desc: 'Delivered across Nepal in 2-5 days' },
+                { icon: '🚚', title: 'Delivery on Contact', desc: 'Charge confirmed with you before delivery · 2-5 days across Nepal' },
                 { icon: '↩️', title: 'Easy Returns', desc: '7-day return policy' },
                 { icon: '✅', title: '100% Genuine', desc: 'Quality guaranteed' },
                 { icon: '💳', title: 'Secure Payment', desc: 'eSewa, Khalti, COD accepted' },
@@ -533,7 +533,7 @@ export default function ProductDetail() {
           {activeTab === 'delivery' && (
             <div className="max-w-2xl space-y-4">
               {[
-                { icon: '🚚', title: 'Standard Delivery', desc: 'Delivered in 2-5 business days across Nepal. Free for all orders.' },
+                { icon: '🚚', title: 'Standard Delivery', desc: 'Delivered in 2-5 business days across Nepal. Charge confirmed with you before delivery.' },
                 { icon: '🏔️', title: 'Hilly Regions', desc: 'Delivery to hilly areas may take 5-10 days.' },
                 { icon: '↩️', title: 'Return Policy', desc: 'Return within 7 days if you receive damaged or wrong product.' },
                 { icon: '📦', title: 'Packaging', desc: 'All products are carefully packed.' },

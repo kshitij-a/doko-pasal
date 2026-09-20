@@ -375,7 +375,7 @@ export default function Checkout() {
                 </div>
                 {couponMsg && <p className={`text-xs ${discount > 0 ? 'text-[#2A7D4F]' : 'text-[#B5293A]'}`}>{couponMsg}</p>}
                 {discount > 0 && <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Coupon ({couponCode})</span><span>−Rs. {discount.toLocaleString()}</span></div>}
-                <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Delivery</span><span>FREE</span></div>
+                <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Delivery</span><span>On contact</span></div>
                 <div className="flex justify-between font-bold text-xl text-[#B5293A] pt-2 border-t border-[#E8E3DB]">
                   <span>Total</span><span>Rs. {payableTotal.toLocaleString()}</span>
                 </div>

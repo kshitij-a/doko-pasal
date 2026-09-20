@@ -1,8 +1,9 @@
 export const FREE_DELIVERY_THRESHOLD = 2000
-export const DELIVERY_DISPLAY = 'FREE'
+// Delivery charge is confirmed with the customer on contact before delivery.
+export const DELIVERY_DISPLAY = 'On contact'
 
 export function deliveryProgress(total: number): { remaining: number; widthPct: number } {
   const remaining = Math.max(0, FREE_DELIVERY_THRESHOLD - total)
-  // Free delivery on all orders — bar always full.
+  // Informational bar only — no free-shipping promise.
   return { remaining, widthPct: 100 }
 }

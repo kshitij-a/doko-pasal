@@ -88,7 +88,7 @@ export default function CartDrawer({ open, onClose, cart, cartTotal, onRemove, o
               <span className="text-sm text-[#6B6560]">Subtotal ({itemCount} items)</span>
               <span className="text-lg font-bold text-[#1E1A16]">Rs. {cartTotal.toLocaleString()}</span>
             </div>
-            <p className="text-xs text-[#2A7D4F] font-semibold mb-4">Free delivery across Nepal</p>
+            <p className="text-xs text-[#2A7D4F] font-semibold mb-4">Delivery charge confirmed before delivery</p>
             <div className="flex gap-3">
               <Link href="/cart" onClick={onClose}
                 className="flex-1 btn-ghost-dark text-center py-3 text-sm">

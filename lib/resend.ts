@@ -144,7 +144,7 @@ export async function sendOrderEmail({
         <div style="background: #f9fafb; border-radius: 12px; padding: 16px;">
           <p style="margin: 0 0 8px; font-size: 12px; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">💳 Payment</p>
           <p style="margin: 0; font-weight: 600; color: #111827; font-size: 14px;">${escapeHtml(String(paymentLabels[paymentMethod] || paymentMethod || ''))}</p>
-          <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">🚚 Free delivery</p>
+          <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">🚚 Delivery charge confirmed before delivery</p>
           <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">⏱️ 2-5 business days</p>
         </div>
       </div>

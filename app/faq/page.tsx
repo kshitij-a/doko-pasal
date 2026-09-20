@@ -8,7 +8,7 @@ export const metadata = {
 
 const FAQS = [
   { q: 'How long does delivery take?', a: 'Inside Kathmandu Valley: 1–2 business days. Outside the valley: 2–5 business days across all 77 districts.' },
-  { q: 'What are the delivery charges?', a: 'Flat Rs. 100 nationwide. Orders above Rs. 2,000 get free delivery.' },
+  { q: 'What are the delivery charges?', a: 'We confirm the delivery charge with you by phone or message before dispatching your order. Delivery takes 2-5 business days across Nepal.' },
   { q: 'Do you offer Cash on Delivery (COD)?', a: 'Yes! COD is available everywhere in Nepal. Pay in cash when your order arrives.' },
   { q: 'What is your return policy?', a: '7-day easy returns on unworn items with tags attached. Custom-stitched items are final sale. See our Return Policy page for details.' },
   { q: 'How do I find my size?', a: 'Each product page lists sizes (S–XXL / Free Size). Measure your chest and compare with the size chart. Between sizes? Size up for kurtas and saree blouses.' },

@@ -142,7 +142,7 @@ export default function Cart() {
           const { widthPct } = deliveryProgress(total)
           return (
           <div className="bg-white rounded-2xl shadow p-4 mb-6">
-            <p className="text-sm font-bold text-green-700 mb-2">🎉 You&apos;ve unlocked FREE delivery — FREE delivery on all orders</p>
+            <p className="text-sm font-bold text-green-700 mb-2">📞 Delivery charge is confirmed with you before delivery</p>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full bg-green-500 rounded-full" style={{ width: `${widthPct}%` }} />
             </div>
@@ -229,7 +229,7 @@ export default function Cart() {
                   </div>
                   <div className="flex justify-between text-gray-600 text-sm">
                     <span>Delivery</span>
-                    <span className="text-green-600 font-bold">FREE</span>
+                    <span className="text-amber-600 font-bold">On contact</span>
                   </div>
                   <div className="border-t-2 pt-3 flex justify-between font-extrabold text-xl">
                     <span>Total</span>
@@ -250,7 +250,7 @@ export default function Cart() {
 
                 <div className="mt-5 pt-4 border-t space-y-2">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>✅</span><span>Free delivery across Nepal</span>
+                    <span>✅</span><span>Delivery charge confirmed before delivery</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>💳</span><span>eSewa, Khalti, COD accepted</span>
