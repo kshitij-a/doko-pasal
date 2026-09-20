@@ -48,8 +48,21 @@ export async function POST(request: Request) {
     // Optional coupon: recompute discount server-side with the same rules as /api/validate-coupon.
     let discount = 0
     let coupon: any = null
+    let loyaltyRedeem = 0
     if (couponCode) {
       const code = String(couponCode).trim().toUpperCase()
+      // LOYALTY: 1 pt = Rs. 1. Balance enforced here (validate-coupon is preview only).
+      if (code === 'LOYALTY') {
+        const { data: row } = await supabase.from('loyalty_points').select('points').eq('user_id', userId).single()
+        const balance = Math.max(0, Math.floor(Number(row?.points || 0)))
+        const want = Number.isFinite(Number(body.pointsToUse)) ? Math.floor(Number(body.pointsToUse)) : balance
+        loyaltyRedeem = Math.min(balance, Math.max(0, want), Math.floor(serverTotal))
+        if (loyaltyRedeem <= 0) {
+          return NextResponse.json({ valid: false, message: 'Insufficient loyalty points' }, { status: 400 })
+        }
+        discount = loyaltyRedeem
+        serverTotal -= discount
+      } else {
       const { data } = await supabase.from('coupons').select('*').eq('code', code).single()
       coupon = data || null
       const usable = coupon && coupon.active
@@ -63,6 +76,7 @@ export async function POST(request: Request) {
         ? Math.floor(serverTotal * (coupon.value / 100))
         : Math.min(coupon.value, serverTotal)
       serverTotal -= discount
+      }
     }
 
     if (Math.abs(serverTotal - order.total_amount) > 0.01) {
@@ -78,6 +92,32 @@ export async function POST(request: Request) {
         clientTotal: order.total_amount,
         message: 'Order total was corrected to match server prices',
       })
+    }
+
+    // Earn: 1 pt per Rs. 100 of final total. loyalty_ledger order_id UNIQUE = idempotent.
+    // Redeem: deduct LOYALTY discount once, guarded by coupon_redemptions order_id UNIQUE.
+    if (finalize === true) {
+      const earned = Math.floor(serverTotal / 100)
+      if (earned > 0) {
+        const { error: ledgerError } = await supabase
+          .from('loyalty_ledger')
+          .insert({ order_id: orderId, user_id: userId, points: earned })
+        if (!ledgerError) {
+          const { data: bal } = await supabase.from('loyalty_points').select('points').eq('user_id', userId).single()
+          const next = (bal ? Number(bal.points) || 0 : 0) + earned
+          if (bal) await supabase.from('loyalty_points').update({ points: next }).eq('user_id', userId)
+          else await supabase.from('loyalty_points').insert({ user_id: userId, points: next })
+        }
+      }
+      if (loyaltyRedeem > 0) {
+        const { error: redeemError } = await supabase
+          .from('coupon_redemptions')
+          .insert({ coupon_code: 'LOYALTY', order_id: orderId })
+        if (!redeemError) {
+          const { data: bal } = await supabase.from('loyalty_points').select('points').eq('user_id', userId).single()
+          if (bal) await supabase.from('loyalty_points').update({ points: Math.max(0, (Number(bal.points) || 0) - loyaltyRedeem) }).eq('user_id', userId)
+        }
+      }
     }
 
     // FIX-05: idempotent coupon use via coupon_redemptions (order_id UNIQUE).

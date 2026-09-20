@@ -12,6 +12,30 @@ export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterMsg, setNewsletterMsg] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const flashEnds = (() => {
+    const d = new Date()
+    d.setHours(24, 0, 0, 0)
+    while (d.getDay() !== 0) d.setDate(d.getDate() + 1)
+    return d.getTime()
+  })()
+  const flashLeft = Math.max(0, flashEnds - now)
+  const flashParts = [
+    Math.floor(flashLeft / 86400000),
+    Math.floor(flashLeft / 3600000) % 24,
+    Math.floor(flashLeft / 60000) % 60,
+    Math.floor(flashLeft / 1000) % 60,
+  ]
+  const flashSale = [...featuredProducts]
+    .filter(p => p.sale_price != null && p.sale_price < p.price)
+    .sort((a, b) => ((b.price - b.sale_price) / b.price) - ((a.price - a.sale_price) / a.price))
+    .slice(0, 8)
 
   const submitNewsletter = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -260,6 +284,53 @@ export default function Home() {
         </section>
       )}
 
+      {/* Flash Sale */}
+      {flashSale.length > 0 && (
+        <section className="py-16 sm:py-20 px-6 sm:px-8 bg-[#1E1A16] text-white">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
+              <div>
+                <p className="text-[10px] font-bold text-[#C9963A] uppercase tracking-[0.2em] mb-2">Limited Time</p>
+                <h2 className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>⚡ Flash Sale</h2>
+                <p className="text-sm text-white/60 mt-2">
+                  Ends in {flashParts[0]}d {String(flashParts[1]).padStart(2, '0')}h {String(flashParts[2]).padStart(2, '0')}m {String(flashParts[3]).padStart(2, '0')}s
+                  {' '}· <Link href="/finder" className="text-[#C9963A] font-bold hover:text-white transition">Not sure what fits? Try the Finder →</Link>
+                </p>
+              </div>
+              <Link href="/products?sale=true" className="text-sm font-bold text-[#C9963A] hover:text-white transition hidden sm:inline-flex items-center gap-1">
+                View All →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5">
+              {flashSale.map((product) => {
+                const images = product.image_urls?.length > 0 ? product.image_urls : product.image_url ? [product.image_url] : []
+                return (
+                  <Link href={`/products/${product.id}`} key={product.id} className="product-card group">
+                    <div className="product-image-wrap">
+                      {images.length > 0
+                        ? <img src={images[0]} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                        : <div className="w-full h-full flex items-center justify-center text-4xl bg-[#F5F2EE]">🧺</div>
+                      }
+                      <span className="absolute top-3 left-3 badge-sale">
+                        −{Math.round((product.price - product.sale_price) / product.price * 100)}%
+                      </span>
+                    </div>
+                    <div className="product-body">
+                      <p className="product-category">{product.category || 'Clothing'}</p>
+                      <p className="product-name truncate">{product.name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="price text-base">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+                        <span className="price-old text-sm">Rs. {product.price?.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Trust Bar */}
       <section className="py-16 sm:py-20 px-6 sm:px-8 bg-[#F2EFE9]">
         <div className="max-w-5xl mx-auto">
@@ -352,6 +423,9 @@ export default function Home() {
                   { label: 'FAQ', href: '/faq' },
                   { label: 'Return Policy', href: '/return-policy' },
                   { label: 'Track Order', href: '/track-order' },
+                  { label: 'Terms', href: '/terms' },
+                  { label: 'Privacy', href: '/privacy' },
+                  { label: 'Shipping', href: '/shipping' },
                 ].map(item => (
                   <li key={item.label}><Link href={item.href} className="text-sm text-white/50 hover:text-white transition">{item.label}</Link></li>
                 ))}
@@ -362,9 +436,9 @@ export default function Home() {
             <div>
               <h4 className="text-[10px] font-bold text-[#C9963A] uppercase tracking-widest mb-4">Connect</h4>
               <ul className="space-y-2.5">
-                <li><a href="https://facebook.com/dokopasal" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">Facebook</a></li>
-                <li><a href="https://instagram.com/dokopasal" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">Instagram</a></li>
-                <li><a href="https://tiktok.com/@dokopasal" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">TikTok</a></li>
+                <li><a href="https://www.facebook.com/kshitij.neupane.507" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">Facebook</a></li>
+                <li><a href="https://www.instagram.com/_kshitizz_18/" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">Instagram</a></li>
+                <li><a href="https://www.tiktok.com/@kshitij.neupane" target="_blank" rel="noopener noreferrer" className="text-sm text-white/50 hover:text-white transition">TikTok</a></li>
               </ul>
               <div className="mt-6">
                 <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">Newsletter</p>

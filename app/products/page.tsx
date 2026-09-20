@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import Link from 'next/link'
@@ -22,7 +23,9 @@ function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQui
         <div className="product-image-wrap">
           {images.length > 0 ? (
             <>
-              <img src={images[currentImg]} alt={product.name} className="w-full h-full object-cover" />
+              <Image src={images[currentImg]} alt={product.name} fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-cover" />
               {images.length > 1 && (
                 <>
                   <button type="button" aria-label="Previous image" onClick={(e) => { e.preventDefault(); setCurrentImg(i => (i - 1 + images.length) % images.length) }}

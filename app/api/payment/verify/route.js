@@ -23,8 +23,29 @@ async function settlePaidOrder(supabase, orderId) {
         console.error('decrement_stock error:', e)
       }
     }
-    const { data: ord } = await supabase.from('orders').select('coupon_code').eq('id', orderId).single()
-    if (ord && ord.coupon_code) {
+    const { data: ord } = await supabase.from('orders').select('user_id, total_amount, coupon_code, discount_amount').eq('id', orderId).single()
+    // Loyalty earn: 1 pt per Rs. 100 of final total, idempotent via loyalty_ledger order_id UNIQUE.
+    if (ord && ord.user_id) {
+      const earned = Math.floor(Number(ord.total_amount || 0) / 100)
+      if (earned > 0) {
+        const { error: ledgerError } = await supabase.from('loyalty_ledger').insert({ order_id: orderId, user_id: ord.user_id, points: earned })
+        if (!ledgerError) {
+          const { data: bal } = await supabase.from('loyalty_points').select('points').eq('user_id', ord.user_id).single()
+          const next = (bal ? Number(bal.points) || 0 : 0) + earned
+          if (bal) await supabase.from('loyalty_points').update({ points: next }).eq('user_id', ord.user_id)
+          else await supabase.from('loyalty_points').insert({ user_id: ord.user_id, points: next })
+        }
+      }
+      // LOYALTY redeem: deduct once, guarded by coupon_redemptions order_id UNIQUE.
+      if (ord.coupon_code && String(ord.coupon_code).toUpperCase() === 'LOYALTY' && Number(ord.discount_amount) > 0) {
+        const { error: redeemError } = await supabase.from('coupon_redemptions').insert({ coupon_code: 'LOYALTY', order_id: orderId })
+        if (!redeemError) {
+          const { data: bal } = await supabase.from('loyalty_points').select('points').eq('user_id', ord.user_id).single()
+          if (bal) await supabase.from('loyalty_points').update({ points: Math.max(0, (Number(bal.points) || 0) - Math.floor(Number(ord.discount_amount))) }).eq('user_id', ord.user_id)
+        }
+      }
+    }
+    if (ord && ord.coupon_code && String(ord.coupon_code).toUpperCase() !== 'LOYALTY') {
       const code = String(ord.coupon_code).toUpperCase()
       const { error: redeemError } = await supabase.from('coupon_redemptions').insert({ coupon_code: code, order_id: orderId })
       if (!redeemError) {

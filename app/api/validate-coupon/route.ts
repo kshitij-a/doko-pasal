@@ -18,6 +18,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Valid cart total required' }, { status: 400 })
     }
 
+    // LOYALTY: 1 pt = Rs. 1, whole rupees only. userId identifies balance (enforced in validate-order).
+    if (code === 'LOYALTY') {
+      const userId = String(body.userId || '')
+      if (!userId) return NextResponse.json({ error: 'Login required to use points' }, { status: 401 })
+      const { data: row } = await supabase.from('loyalty_points').select('points').eq('user_id', userId).single()
+      const balance = Math.max(0, Math.floor(Number(row?.points || 0)))
+      if (balance <= 0) return NextResponse.json({ error: 'No loyalty points yet' }, { status: 400 })
+      const want = Number.isFinite(Number(body.pointsToUse)) ? Math.floor(Number(body.pointsToUse)) : balance
+      const discount = Math.min(balance, Math.max(0, want), Math.floor(cartTotal))
+      if (discount <= 0) return NextResponse.json({ error: 'Points cover Rs. 0 of this order' }, { status: 400 })
+      return NextResponse.json({ valid: true, discount, total: cartTotal - discount, couponCode: 'LOYALTY' })
+    }
+
     const { data: coupon } = await supabase.from('coupons').select('*').eq('code', code).single()
     if (!coupon) return NextResponse.json({ error: 'Invalid coupon code' }, { status: 404 })
     if (!coupon.active) return NextResponse.json({ error: 'Coupon is no longer active' }, { status: 400 })

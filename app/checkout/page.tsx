@@ -17,7 +17,13 @@ export default function Checkout() {
   const [couponCode, setCouponCode] = useState('')
   const [discount, setDiscount] = useState(0)
   const [couponMsg, setCouponMsg] = useState('')
+  const [zones, setZones] = useState<any[]>([])
+  const [zoneId, setZoneId] = useState('')
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0)
+  const [usePoints, setUsePoints] = useState(false)
   const placingRef = useRef(false)
+
+  const selectedZone = zones.find(z => z.id === zoneId) || zones[0]
 
   useEffect(() => {
     try {
@@ -25,12 +31,21 @@ export default function Checkout() {
       if (saved) setCart(JSON.parse(saved))
     } catch (e) { console.error('Failed to parse cart:', e) }
     checkUser()
+    supabase.from('delivery_zones').select('*').eq('active', true).then(({ data }) => {
+      if (data && data.length > 0) {
+        setZones(data)
+        setZoneId(data.find((z: any) => /kathmandu/i.test(z.name))?.id || data[0].id)
+      }
+    })
   }, [])
 
   const checkUser = async () => {
     const { data } = await supabase.auth.getUser()
     if (!data.user) { router.push('/auth/login'); return }
     setUser(data.user)
+    supabase.from('loyalty_points').select('points').eq('user_id', data.user.id).single().then(({ data: row }) => {
+      if (row) setLoyaltyBalance(Math.max(0, Math.floor(Number(row.points) || 0)))
+    })
     setForm(f => ({
       ...f,
       name: data.user.user_metadata?.full_name || '',
@@ -50,7 +65,7 @@ export default function Checkout() {
       const res = await fetch('/api/validate-coupon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, total }),
+        body: JSON.stringify({ code, total, userId: user?.id, pointsToUse: code === 'LOYALTY' ? loyaltyBalance : undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setCouponMsg(data.error || 'Invalid coupon'); setDiscount(0); setCouponCode(''); return }
@@ -71,6 +86,11 @@ export default function Checkout() {
       alert('Input fields exceed maximum length.'); return
     }
     if (cart.length === 0) { alert('Your cart is empty!'); return }
+    if (paymentMethod === 'cod' && selectedZone && selectedZone.cod_allowed === false) {
+      alert(`Cash on Delivery is not available for ${selectedZone.name}. Please choose Khalti, eSewa or Bank Transfer.`)
+      setStep(2)
+      return
+    }
     if (placingRef.current) return
     placingRef.current = true
     setLoading(true)
@@ -119,7 +139,7 @@ export default function Checkout() {
       const validateRes = await fetch('/api/validate-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, userId: user.id, couponCode: couponCode || undefined, finalize: paymentMethod === 'cod' || paymentMethod === 'bank' }),
+        body: JSON.stringify({ orderId: order.id, userId: user.id, couponCode: couponCode || undefined, pointsToUse: couponCode === 'LOYALTY' ? loyaltyBalance : undefined, finalize: paymentMethod === 'cod' || paymentMethod === 'bank' }),
       })
       const validation = await validateRes.json()
       if (!validateRes.ok || validation.valid === false) {
@@ -193,7 +213,7 @@ export default function Checkout() {
       } catch (e) { console.log('Stock decrement error:', e) }
     }
     if (paymentMethod === 'bank') {
-      alert(`Bank Transfer Details:\n\nBank: ${process.env.NEXT_PUBLIC_BANK_NAME || 'Nepal Investment Bank'}\nAccount Name: ${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'Doko Pasal'}\nAccount No: ${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NO || '001234567890'}\n\nAfter transfer, WhatsApp screenshot to: ${process.env.NEXT_PUBLIC_SHOP_WHATSAPP || '98XXXXXXXX'}\nMention Order ID: ${order.id.slice(0,8).toUpperCase()}`)
+      alert(`Bank Transfer Details:\n\nBank: ${process.env.NEXT_PUBLIC_BANK_NAME || 'Nepal Investment Bank'}\nAccount Name: ${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'Doko Pasal'}\nAccount No: ${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NO || '001234567890'}\n\nAfter transfer, WhatsApp screenshot to: ${process.env.NEXT_PUBLIC_SHOP_WHATSAPP || '9806603339'}\nMention Order ID: ${order.id.slice(0,8).toUpperCase()}`)
     }
     try {
       await fetch('/api/send-email', {
@@ -281,6 +301,15 @@ export default function Checkout() {
                       <label className="block text-xs font-bold text-[#6B6560] uppercase tracking-wider mb-1.5">Landmark</label>
                       <input type="text" value={form.landmark} onChange={e => setForm({...form, landmark: e.target.value})} placeholder="Near school/hospital" className="input" />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#6B6560] uppercase tracking-wider mb-1.5">Delivery Zone *</label>
+                    <select value={zoneId} onChange={e => setZoneId(e.target.value)} className="input">
+                      {zones.map(z => (
+                        <option key={z.id} value={z.id}>{z.name} — {z.eta_days}{z.cod_allowed === false ? ' (no COD)' : ''}</option>
+                      ))}
+                    </select>
+                    {selectedZone && <p className="text-xs text-[#6B6560] mt-1">Estimated delivery: {selectedZone.eta_days}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#6B6560] uppercase tracking-wider mb-1.5">Order Note</label>
@@ -374,8 +403,19 @@ export default function Checkout() {
                   <button onClick={applyCoupon} className="btn-ghost-dark px-4 py-2 text-sm whitespace-nowrap">Apply</button>
                 </div>
                 {couponMsg && <p className={`text-xs ${discount > 0 ? 'text-[#2A7D4F]' : 'text-[#B5293A]'}`}>{couponMsg}</p>}
+                {loyaltyBalance > 0 && (
+                  <label className="flex items-center gap-2 text-sm text-[#6B6560] cursor-pointer">
+                    <input type="checkbox" checked={usePoints} onChange={e => {
+                      const checked = e.target.checked
+                      setUsePoints(checked)
+                      setCouponInput(checked ? 'LOYALTY' : '')
+                    }} className="w-4 h-4 accent-[#B5293A]" />
+                    Use loyalty points ({loyaltyBalance} pts = Rs. {loyaltyBalance.toLocaleString()} off)
+                  </label>
+                )}
                 {discount > 0 && <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Coupon ({couponCode})</span><span>−Rs. {discount.toLocaleString()}</span></div>}
                 <div className="flex justify-between text-sm text-[#2A7D4F] font-bold"><span>Delivery</span><span>On contact</span></div>
+                {selectedZone && <div className="flex justify-between text-xs text-[#6B6560]"><span>ETA ({selectedZone.name})</span><span>{selectedZone.eta_days}</span></div>}
                 <div className="flex justify-between font-bold text-xl text-[#B5293A] pt-2 border-t border-[#E8E3DB]">
                   <span>Total</span><span>Rs. {payableTotal.toLocaleString()}</span>
                 </div>

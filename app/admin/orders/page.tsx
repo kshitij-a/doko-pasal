@@ -22,6 +22,7 @@ export default function AdminOrders() {
   const [updating, setUpdating] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [returns, setReturns] = useState<Record<string, any>>({})
 
   useEffect(() => { checkAdmin() }, [])
 
@@ -37,6 +38,27 @@ export default function AdminOrders() {
     const { data } = await supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false })
     if (data) setOrders(data)
     setLoading(false)
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token ?? ''
+      const res = await fetch('/api/returns', { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      const map: Record<string, any> = {}
+      for (const r of json.returns || []) map[r.order_id] = r
+      setReturns(map)
+    } catch { /* returns optional */ }
+  }
+
+  const reviewReturn = async (id: string, orderId: string, status: 'approved' | 'rejected') => {
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token ?? ''
+      const res = await fetch('/api/returns', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id, status }),
+      })
+      if (!res.ok) { alert('Failed to update return'); return }
+      setReturns(r => ({ ...r, [orderId]: { ...r[orderId], status } }))
+    } catch { alert('Failed to update return') }
   }
 
   const updateStatus = async (orderId: string, newStatus: string) => {
@@ -205,11 +227,26 @@ export default function AdminOrders() {
                       )}
                     </div>
 
-                    {/* Address */}
-                    <div style={{ marginBottom: 16 }}>
-                      <h4 style={{ font: '600 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>Delivery Address</h4>
-                      <p style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text)', margin: 0 }}>{order.customer_address}</p>
-                    </div>
+                      {/* Address */}
+                      <div style={{ marginBottom: 16 }}>
+                        <h4 style={{ font: '600 12px var(--admin-font-ui)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>Delivery Address</h4>
+                        <p style={{ font: '400 13px var(--admin-font-ui)', color: 'var(--admin-text)', margin: 0 }}>{order.customer_address}</p>
+                      </div>
+
+                      {/* Return request */}
+                      {returns[order.id] && (
+                        <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                          <p style={{ font: '500 13px var(--admin-font-ui)', color: 'var(--admin-text)', margin: '0 0 4px' }}>
+                            ↩️ Return {returns[order.id].status}: {returns[order.id].reason}
+                          </p>
+                          {returns[order.id].status === 'requested' && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                              <button className="btn-admin-ghost" style={{ color: 'var(--admin-green)', fontSize: 12, padding: '5px 12px' }} onClick={() => reviewReturn(returns[order.id].id, order.id, 'approved')}>Approve</button>
+                              <button className="btn-admin-ghost" style={{ color: 'var(--admin-red)', fontSize: 12, padding: '5px 12px' }} onClick={() => reviewReturn(returns[order.id].id, order.id, 'rejected')}>Reject</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                     {/* Controls */}
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

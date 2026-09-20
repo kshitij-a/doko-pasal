@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase } from '../../../lib/supabase'
+import { getBaseUrl, SITE_NAME, CURRENCY } from '../../../lib/site'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '../../../components/Navbar'
@@ -200,6 +202,41 @@ export default function ProductDetail() {
   const cartCount = cart.reduce((a: number, i: any) => a + i.qty, 0)
   const cartTotal = cart.reduce((sum: number, i: any) => sum + i.price * i.qty, 0)
 
+  const baseUrl = getBaseUrl()
+  const productJsonLd = product ? {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    image: images,
+    description: product.description || product.name,
+    sku: product.id,
+    brand: { "@type": "Brand", name: SITE_NAME },
+    offers: {
+      "@type": "Offer",
+      url: `${baseUrl}/products/${product.id}`,
+      priceCurrency: CURRENCY,
+      price: effPrice(product),
+      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+    ...(reviews.length > 0 ? {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length,
+        reviewCount: reviews.length,
+      },
+    } : {}),
+  } : null
+  const breadcrumbJsonLd = product ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: baseUrl },
+      { "@type": "ListItem", position: 2, name: "Products", item: `${baseUrl}/products` },
+      { "@type": "ListItem", position: 3, name: product.category, item: `${baseUrl}/products?category=${encodeURIComponent(product.category)}` },
+      { "@type": "ListItem", position: 4, name: product.name },
+    ],
+  } : null
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="text-center">
@@ -224,6 +261,12 @@ export default function ProductDetail() {
   return (
     <main className="min-h-screen bg-white pb-16 sm:pb-0">
       {/* TOAST */}
+      {productJsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
+      )}
+      {breadcrumbJsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      )}
       {toast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
           {toast}
@@ -253,8 +296,9 @@ export default function ProductDetail() {
               style={{ aspectRatio: '1' }}
               onClick={() => setImgZoom(true)}>
               {images.length > 0 ? (
-                <img src={images[selectedImg]} alt={product.name}
-                  className="w-full h-full object-cover hover:scale-110 transition duration-500" />
+                <Image src={images[selectedImg]} alt={product.name} fill
+                  sizes="(max-width: 768px) 100vw, 50vw" priority
+                  className="object-cover hover:scale-110 transition duration-500" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-9xl opacity-20">
                   {product.category === "Men's Wear" ? '👔' : product.category === "Women's Wear" ? '👗' : '🧒'}
@@ -279,8 +323,8 @@ export default function ProductDetail() {
               <div className="flex gap-2 flex-wrap">
                 {images.map((img: string, i: number) => (
                   <button key={i} onClick={() => setSelectedImg(i)}
-                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition ${selectedImg === i ? 'border-red-600 scale-105' : 'border-gray-200 hover:border-gray-400'}`}>
-                    <img src={img} alt={`View ${i + 1}`} className="w-full h-full object-cover" />
+                    className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition ${selectedImg === i ? 'border-red-600 scale-105' : 'border-gray-200 hover:border-gray-400'}`}>
+                    <Image src={img} alt={`View ${i + 1}`} fill sizes="64px" className="object-cover" />
                   </button>
                 ))}
               </div>
@@ -560,9 +604,9 @@ export default function ProductDetail() {
                 return (
                   <Link key={item.id} href={`/products/${item.id}`}
                     className="bg-white rounded-2xl shadow hover:shadow-lg transition overflow-hidden group">
-                    <div className="bg-gray-50 h-40 flex items-center justify-center overflow-hidden">
+                    <div className="relative bg-gray-50 h-40 flex items-center justify-center overflow-hidden">
                       {itemImgs.length > 0
-                        ? <img src={itemImgs[0]} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                        ? <Image src={itemImgs[0]} alt={item.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition" />
                         : <span className="text-5xl opacity-30">{item.category === "Men's Wear" ? '👔' : '👗'}</span>}
                     </div>
                     <div className="p-3">
@@ -586,9 +630,9 @@ export default function ProductDetail() {
                 return (
                   <Link key={item.id} href={`/products/${item.id}`}
                     className="bg-white rounded-2xl shadow hover:shadow-lg transition overflow-hidden group">
-                    <div className="bg-gray-50 h-40 flex items-center justify-center overflow-hidden">
+                    <div className="relative bg-gray-50 h-40 flex items-center justify-center overflow-hidden">
                       {itemImgs.length > 0
-                        ? <img src={itemImgs[0]} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                        ? <Image src={itemImgs[0]} alt={item.name} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition" />
                         : <span className="text-5xl opacity-30">{item.category === "Men's Wear" ? '👔' : '👗'}</span>}
                     </div>
                     <div className="p-3">

@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co' }],
+    remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co' }, { protocol: 'https', hostname: 'images.unsplash.com' }],
   },
   async headers() {
     return [
@@ -20,11 +20,11 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' https: data: blob:",
-              "connect-src 'self' https://*.supabase.co https://a.khalti.com https://rc.esewa.com.np https://rc-epay.esewa.com.np https://epay.esewa.com.np https://esewa.com.np https://api.resend.com",
+              "connect-src 'self' https://*.supabase.co https://a.khalti.com https://rc.esewa.com.np https://rc-epay.esewa.com.np https://epay.esewa.com.np https://esewa.com.np https://api.resend.com https://www.google-analytics.com",
               "frame-src 'self' https://a.khalti.com https://rc-epay.esewa.com.np https://epay.esewa.com.np https://esewa.com.np",
             ].join('; '),
           },

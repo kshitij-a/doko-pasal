@@ -11,6 +11,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [user, setUser] = useState<any>(null)
+  const [returns, setReturns] = useState<Record<string, any>>({})
   const router = useRouter()
 
   useEffect(() => { checkUserAndFetch() }, [])
@@ -28,8 +29,32 @@ export default function Orders() {
       const { data, error } = await supabase.from('orders').select('*, order_items(*)').eq('user_id', userId).order('created_at', { ascending: false })
       if (error) setError('Could not load your orders: ' + error.message)
       else if (data) setOrders(data)
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token ?? ''
+        const res = await fetch('/api/returns', { headers: { Authorization: `Bearer ${token}` } })
+        const json = await res.json()
+        const map: Record<string, any> = {}
+        for (const r of json.returns || []) map[r.order_id] = r
+        setReturns(map)
+      } catch { /* returns optional */ }
     } catch (err) { setError('Could not load your orders. Please try again.') }
     finally { setLoading(false) }
+  }
+
+  const requestReturn = async (orderId: string) => {
+    const reason = prompt('Why are you returning this order?')
+    if (!reason || !reason.trim()) return
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token ?? ''
+      const res = await fetch('/api/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId, reason: reason.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok) { alert(json.error || 'Return request failed'); return }
+      setReturns(r => ({ ...r, [orderId]: json.return }))
+    } catch { alert('Return request failed') }
   }
 
   const statusBadge = (status: string) => {
@@ -151,6 +176,13 @@ export default function Orders() {
                     <p className="text-xs text-[#9E9994]">Delivering to: <span className="font-semibold text-[#6B6560]">{order.customer_address}</span></p>
                     <p className="text-lg font-bold text-[#B5293A]">Rs. {order.total_amount?.toLocaleString()}</p>
                   </div>
+                  {order.order_status === 'delivered' && (
+                    <div className="pt-3">
+                      {returns[order.id]
+                        ? <p className="text-xs font-semibold text-[#6B6560]">Return: {returns[order.id].status}</p>
+                        : <button onClick={() => requestReturn(order.id)} className="btn-ghost-dark px-4 py-2 text-xs">Request return</button>}
+                    </div>
+                  )}
                 </div>
               )
             })}

@@ -16,6 +16,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [points, setPoints] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -30,6 +31,9 @@ export default function ProfilePage() {
       setEmail(data.user.email || '')
       setPhone(data.user.user_metadata?.phone || '')
       setAvatarUrl(data.user.user_metadata?.avatar_url || '')
+      supabase.from('loyalty_points').select('points').eq('user_id', data.user.id).single().then(({ data: row }) => {
+        setPoints(row ? Math.max(0, Math.floor(Number(row.points) || 0)) : 0)
+      })
     }
     loadUser()
   }, [router])
@@ -109,6 +113,12 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="mt-8 space-y-3">
+              {points != null && (
+                <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center">
+                  <p className="text-2xl font-extrabold text-amber-300">🪙 {points.toLocaleString()} pts</p>
+                  <p className="text-xs text-slate-400">1 pt = Rs. 1 off · earn 1 pt per Rs. 100</p>
+                </div>
+              )}
               <Link href="/orders" className="block rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 hover:border-red-600 hover:text-red-300 transition">
                 My Orders
               </Link>

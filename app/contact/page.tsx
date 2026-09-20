@@ -38,6 +38,10 @@ export default function ContactPage() {
         <p className="text-[10px] font-bold text-[#9E9994] uppercase tracking-[0.2em] mb-2">Get in touch</p>
         <h1 className="text-3xl sm:text-4xl font-bold text-[#1E1A16]" style={{ fontFamily: 'var(--font-display)' }}>Contact Us</h1>
         <div className="w-12 h-0.5 bg-[#B5293A] mt-4 mb-8 rounded-full" />
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+          <a href="tel:+9779806603339" className="text-sm font-bold text-[#1E1A16]">+977 9806603339</a>
+          <a href="https://wa.me/9779806603339" target="_blank" rel="noopener noreferrer" className="bg-[#1E1A16] text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#C9963A] hover:text-[#1E1A16] transition">Chat on WhatsApp</a>
+        </div>
         <form onSubmit={submit} className="bg-white border border-[#E8E3DB] rounded-2xl p-6 space-y-4">
           <input
             value={form.name}
