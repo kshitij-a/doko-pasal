@@ -40,6 +40,7 @@ export default function AdminProducts() {
   }
 
   const fetchProducts = async () => {
+    // No /api/admin/products endpoint: CRUD stays direct, gated by proxy + RLS.
     const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
     if (data) setProducts(data)
     setLoading(false)

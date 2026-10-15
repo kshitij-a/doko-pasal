@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <p><strong className="text-[#1E1A16]">Consent.</strong> By placing an order or creating an account, you consent to this use. You can withdraw marketing consent any time by messaging us.</p>
           <p><strong className="text-[#1E1A16]">Retention.</strong> We keep order records as long as needed for returns, warranties, and legal compliance, then delete or anonymise them.</p>
           <p><strong className="text-[#1E1A16]">Security.</strong> Data is stored securely via Supabase with restricted access. We never store card details — online payments run entirely through hosted gateways (Khalti, eSewa, banks).</p>
-          <p><strong className="text-[#1E1A16]">Cookies.</strong> We track nothing except what is needed to keep you logged in (auth session). No advertising or analytics trackers.</p>
+          <p><strong className="text-[#1E1A16]">Cookies & analytics.</strong> We keep you logged in via an auth session cookie. When enabled, we also use Google Analytics (GA4) for aggregate traffic stats and log page activity (views, cart actions) to improve the store. No advertising trackers.</p>
           <p>
             <strong className="text-[#1E1A16]">Your rights & contact.</strong> Ask for a copy, correction, or deletion of your data via WhatsApp at <a href="https://wa.me/9779806603339" className="font-bold text-[#B5293A]">+977 9806603339</a> or <a href="mailto:support@dokopasal.com" className="font-bold text-[#B5293A]">support@dokopasal.com</a>. We respond to grievances within 48 hours.
           </p>

@@ -9,6 +9,63 @@ function getServiceClient() {
   return createClient(url, serviceKey)
 }
 
+// Caller identity: service client can't tell who called, so verify the Bearer token via anon client.
+async function getCaller(req) {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return { error: 'Unauthorized - no Bearer token provided' }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) return { error: 'Auth misconfigured' }
+  const anon = createClient(url, anonKey)
+  const { data: { user }, error } = await anon.auth.getUser(authHeader.replace('Bearer ', ''))
+  if (error || !user) return { error: 'Invalid or expired token' }
+  return { user }
+}
+
+// Server re-price: never trust the stored total; recompute from live product prices.
+async function computeServerTotal(supabase, orderId) {
+  const { data: items, error } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId)
+  if (error || !items || items.length === 0) return { error: 'Order has no items' }
+  let serverTotal = 0
+  for (const it of items) {
+    const { data: p } = await supabase.from('products').select('price, sale_price').eq('id', it.product_id).single()
+    if (!p) return { error: `Product not found: ${it.product_id}` }
+    const live = p.sale_price && p.sale_price < p.price ? p.sale_price : p.price
+    serverTotal += Number(live) * Number(it.quantity)
+  }
+  return { serverTotal }
+}
+
+// Effective total: live item prices minus a server-recomputed coupon discount.
+// Never trusts stored total_amount/discount_amount (both are client-set at insert).
+async function computeEffectiveTotal(supabase, order) {
+  const { serverTotal, error } = await computeServerTotal(supabase, order.id)
+  if (error) return { error }
+  const discount = Number(order.discount_amount || 0)
+  const code = order.coupon_code ? String(order.coupon_code).trim().toUpperCase() : ''
+  if (!code) {
+    if (Math.abs(discount) > 0.01) return { error: 'Unexpected discount' }
+    return { effectiveTotal: serverTotal }
+  }
+  if (!(discount > 0) || discount - serverTotal > 0.01) return { error: 'Invalid discount' }
+  if (code === 'LOYALTY') {
+    const { data: row } = await supabase.from('loyalty_points').select('points').eq('user_id', order.user_id).single()
+    const balance = Math.max(0, Math.floor(Number(row?.points || 0)))
+    // Partial redemption allowed: discount just can't exceed what the user holds (or the items total).
+    if (discount - Math.min(balance, Math.floor(serverTotal)) > 0.01) return { error: 'Discount exceeds loyalty balance' }
+    return { effectiveTotal: serverTotal - discount }
+  }
+  const { data: coupon } = await supabase.from('coupons').select('*').eq('code', code).single()
+  const usable = coupon && coupon.active
+    && !(coupon.expires_at && new Date(coupon.expires_at) < new Date())
+    && serverTotal >= (coupon.min_order || 0)
+    && !(coupon.max_uses > 0 && (coupon.used_count || 0) >= coupon.max_uses)
+  if (!usable) return { error: 'Coupon is no longer valid for this order' }
+  const expected = coupon.type === 'percentage' ? Math.floor(serverTotal * (coupon.value / 100)) : Math.min(coupon.value, serverTotal)
+  if (Math.abs(discount - expected) > 0.01) return { error: 'Discount mismatch' }
+  return { effectiveTotal: serverTotal - discount }
+}
+
 // Runs once per paid order (verify 409s when already paid, so no double-decrement).
 // Stock failures must never fail payment verification — best-effort only.
 async function settlePaidOrder(supabase, orderId) {
@@ -37,6 +94,10 @@ async function settlePaidOrder(supabase, orderId) {
         }
       }
       // LOYALTY redeem: deduct once, guarded by coupon_redemptions order_id UNIQUE.
+      // used_count bump below is idempotent the same way (only the first settle
+      // inserts + increments). max_uses cap is checked pre-payment in
+      // validate-order; a DB CHECK/trigger on coupons.used_count <= max_uses is
+      // still wanted for races (schema agent).
       if (ord.coupon_code && String(ord.coupon_code).toUpperCase() === 'LOYALTY' && Number(ord.discount_amount) > 0) {
         const { error: redeemError } = await supabase.from('coupon_redemptions').insert({ coupon_code: 'LOYALTY', order_id: orderId })
         if (!redeemError) {
@@ -82,7 +143,10 @@ async function sendPrepaidReceipt(supabase, req, orderId, method) {
     const origin = new URL(req.url).origin
     await fetch(`${origin}/api/send-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Service-to-service auth: send-email route (owned by another agent) must
+      // accept x-internal-secret matching INTERNAL_EMAIL_SECRET. No user Bearer
+      // token exists here (service role acts for the paid order, not the user).
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_EMAIL_SECRET || '' },
       body: JSON.stringify({
         customerName: fullOrder.customer_name,
         customerEmail,
@@ -111,15 +175,32 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })
     }
 
+    const { user, error: authError } = await getCaller(req)
+    if (!user) {
+      return NextResponse.json({ error: authError }, { status: 401 })
+    }
+
     // Fetch order first for amount checks + idempotency
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, total_amount, payment_status')
+      .select('id, user_id, total_amount, discount_amount, coupon_code, payment_status')
       .eq('id', orderId)
       .single()
 
     if (orderError || !order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (order.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden - order does not belong to caller' }, { status: 403 })
+    }
+
+    const { effectiveTotal, error: priceError } = await computeEffectiveTotal(supabase, order)
+    if (priceError) {
+      return NextResponse.json({ success: false, message: priceError }, { status: 400 })
+    }
+    if (Math.abs(effectiveTotal - Number(order.total_amount)) > 0.01) {
+      return NextResponse.json({ success: false, message: 'Stored total does not match server prices' }, { status: 400 })
     }
 
     if (order.payment_status === 'paid') {
@@ -151,17 +232,21 @@ export async function POST(req) {
         if (result.purchase_order_id !== orderId) {
           return NextResponse.json({ success: false, message: 'Order ID mismatch' }, { status: 400 })
         }
-        if (result.amount !== Math.round(Number(order.total_amount) * 100)) {
+        if (result.amount !== Math.round(effectiveTotal * 100)) {
           return NextResponse.json({ success: false, message: 'Amount mismatch' }, { status: 400 })
         }
-        const { error: updateError } = await supabase.from('orders').update({
+        // Atomic paid transition: only a still-pending order flips; 0 rows = already settled.
+        const { data: updated, error: updateError } = await supabase.from('orders').update({
           payment_status: 'paid',
           order_status: 'processing',
           transaction_id: result.transaction_id,
-        }).eq('id', orderId)
+        }).eq('id', orderId).eq('payment_status', 'pending').select('id')
 
         if (updateError) {
           return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
+        }
+        if (!updated || updated.length === 0) {
+          return NextResponse.json({ success: true, alreadyPaid: true, method }, { status: 409 })
         }
 
         await settlePaidOrder(supabase, orderId)
@@ -190,7 +275,7 @@ export async function POST(req) {
         if (!transaction_uuid || !String(transaction_uuid).startsWith(orderId)) {
           return NextResponse.json({ success: false, message: 'Order ID mismatch' }, { status: 400 })
         }
-        if (Math.abs(Number(total_amount) - Number(order.total_amount)) > 0.01) {
+        if (Math.abs(Number(total_amount) - effectiveTotal) > 0.01) {
           return NextResponse.json({ success: false, message: 'Amount mismatch' }, { status: 400 })
         }
         const merchantCode = process.env.ESEWA_MERCHANT_CODE
@@ -207,14 +292,18 @@ export async function POST(req) {
         const verifyResult = await verifyResponse.json()
 
         if (verifyResult.status === 'COMPLETE') {
-          const { error: updateError } = await supabase.from('orders').update({
+          // Atomic paid transition: only a still-pending order flips; 0 rows = already settled.
+          const { data: updated, error: updateError } = await supabase.from('orders').update({
             payment_status: 'paid',
             order_status: 'processing',
             transaction_id: transaction_uuid,
-          }).eq('id', orderId)
+          }).eq('id', orderId).eq('payment_status', 'pending').select('id')
 
           if (updateError) {
             return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
+          }
+          if (!updated || updated.length === 0) {
+            return NextResponse.json({ success: true, alreadyPaid: true, method }, { status: 409 })
           }
 
           await settlePaidOrder(supabase, orderId)

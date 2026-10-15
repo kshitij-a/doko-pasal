@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   if (!authorized) return response!
 
   const supabase = getClient()
-  if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+  if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
   const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ coupons: data })
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
   try {
     const supabase = getClient()
-    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     const body = await request.json()
     const { code, type, value, min_order, max_uses, expires_at } = body
 
@@ -83,7 +83,7 @@ export async function PATCH(request: Request) {
 
   try {
     const supabase = getClient()
-    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     const body = await request.json()
     const { id, ...updates } = body
 
@@ -115,7 +115,7 @@ export async function DELETE(request: Request) {
 
   try {
     const supabase = getClient()
-    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     if (!id || !UUID_RE.test(id)) return NextResponse.json({ error: 'valid ID required' }, { status: 400 })

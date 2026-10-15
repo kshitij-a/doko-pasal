@@ -8,11 +8,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
     }
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, serviceKey)
-    const body = await request.json()
-    const { orderId, userId, couponCode, finalize } = body
 
-    if (!orderId || !userId) {
-      return NextResponse.json({ error: 'Missing orderId or userId' }, { status: 400 })
+    // Caller identity: derive userId from the Bearer token, never trust body userId alone.
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized - no Bearer token provided' }, { status: 401 })
+    }
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!anonKey) {
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+    }
+    const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, anonKey)
+    const { data: { user }, error: authError } = await anon.auth.getUser(authHeader.replace('Bearer ', ''))
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
+    const body = await request.json()
+    const { orderId, couponCode, finalize } = body
+    const userId = user.id
+    if (body.userId && body.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden - userId does not match caller' }, { status: 403 })
+    }
+
+    if (!orderId) {
+      return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })
     }
 
     const { data: order, error: orderError } = await supabase
@@ -96,6 +115,8 @@ export async function POST(request: Request) {
 
     // Earn: 1 pt per Rs. 100 of final total. loyalty_ledger order_id UNIQUE = idempotent.
     // Redeem: deduct LOYALTY discount once, guarded by coupon_redemptions order_id UNIQUE.
+    // Balance bumps are read-modify-write (no supabase-js increment); the UNIQUE
+    // inserts make each run once-per-order, so races can't double-apply.
     if (finalize === true) {
       const earned = Math.floor(serverTotal / 100)
       if (earned > 0) {
@@ -122,6 +143,9 @@ export async function POST(request: Request) {
 
     // FIX-05: idempotent coupon use via coupon_redemptions (order_id UNIQUE).
     // Only the first finalize for an order inserts + increments; duplicates are already-counted.
+    // used_count has no atomic increment in supabase-js; the UNIQUE guard above
+    // makes the bump once-per-order. max_uses cap still needs a DB CHECK/trigger
+    // (coupons.used_count <= max_uses) for races — schema agent.
     if (finalize === true && coupon) {
       const { error: redeemError } = await supabase
         .from('coupon_redemptions')

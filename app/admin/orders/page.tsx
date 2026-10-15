@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 import { useRouter } from 'next/navigation'
 import { npFullDate } from '../../../lib/timezone'
 
@@ -35,6 +36,8 @@ export default function AdminOrders() {
   }
 
   const fetchOrders = async () => {
+    // No /api/admin/orders endpoint: reads stay direct (proxy + RLS gate them);
+    // all writes below go through /api/admin/users with a Bearer token.
     const { data } = await supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false })
     if (data) setOrders(data)
     setLoading(false)
@@ -63,30 +66,38 @@ export default function AdminOrders() {
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     setUpdating(orderId)
-    const { error } = await supabase.from('orders').update({ order_status: newStatus }).eq('id', orderId)
-    if (error) { alert('Failed: ' + error.message); setUpdating(null); return }
-    setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o))
+    try {
+      const res = await adminFetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__order__', data: { orderId, order_status: newStatus } }) })
+      if (!res.ok) { alert('Failed to update status'); setUpdating(null); return }
+      setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o))
+    } catch { alert('Failed to update status') }
     setUpdating(null)
   }
 
   const updatePayment = async (orderId: string, newStatus: string) => {
-    const { error } = await supabase.from('orders').update({ payment_status: newStatus }).eq('id', orderId)
-    if (error) { alert('Failed: ' + error.message); return }
-    setOrders(orders.map(o => o.id === orderId ? { ...o, payment_status: newStatus } : o))
+    try {
+      const res = await adminFetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__order__', data: { orderId, payment_status: newStatus } }) })
+      if (!res.ok) { alert('Failed to update payment'); return }
+      setOrders(orders.map(o => o.id === orderId ? { ...o, payment_status: newStatus } : o))
+    } catch { alert('Failed to update payment') }
   }
 
   const cancelOrder = async (orderId: string) => {
     if (!confirm('Cancel this order?')) return
-    const { error } = await supabase.from('orders').update({ order_status: 'cancelled', payment_status: 'cancelled' }).eq('id', orderId)
-    if (error) { alert('Failed: ' + error.message); return }
-    setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
+    try {
+      const res = await adminFetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: '__order__', data: { orderId, order_status: 'cancelled', payment_status: 'cancelled' } }) })
+      if (!res.ok) { alert('Failed to cancel order'); return }
+      setOrders(orders.map(o => o.id === orderId ? { ...o, order_status: 'cancelled', payment_status: 'cancelled' } : o))
+    } catch { alert('Failed to cancel order') }
   }
 
   const deleteOrder = async (orderId: string) => {
     if (!confirm('Permanently DELETE this order?')) return
-    await supabase.from('order_items').delete().eq('order_id', orderId)
-    await supabase.from('orders').delete().eq('id', orderId)
-    setOrders(orders.filter(o => o.id !== orderId))
+    try {
+      const res = await adminFetch(`/api/admin/users?action=delete-order&orderId=${orderId}`, { method: 'DELETE' })
+      if (!res.ok) { alert('Failed to delete order'); return }
+      setOrders(orders.filter(o => o.id !== orderId))
+    } catch { alert('Failed to delete order') }
   }
 
   const counts: Record<string, number> = { all: orders.length }

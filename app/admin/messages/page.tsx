@@ -81,6 +81,8 @@ export default function AdminMessages() {
   }
 
   const fetchConversations = async () => {
+    // No /api/admin/messages endpoint: reads/writes stay direct, gated by
+    // proxy + RLS.
     const { data } = await supabase.from('conversations').select('*').order('last_message_at', { ascending: false })
     if (data) setConversations(data)
     setLoading(false)
@@ -94,15 +96,9 @@ export default function AdminMessages() {
     if (data) setMessages(data)
     await supabase.from('conversations').update({ unread_count: 0 }).eq('id', conv.id)
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
-    // Fetch customer orders for context panel
-    if (conv.user_email) {
-      const { data: userData } = await supabase.auth.admin.listUsers()
-      const user = userData?.users?.find((u: any) => u.email === conv.user_email)
-      if (user) {
-        const { data: orders } = await supabase.from('orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
-        setCustomerOrders(orders || [])
-      }
-    }
+    // No admin user-lookup API and auth.admin.listUsers is unavailable from
+    // the browser client, so per-customer order context is skipped.
+    setCustomerOrders([])
   }
 
   const deleteConversation = async () => {

@@ -82,7 +82,7 @@ function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQui
         )}
 
         <div className="flex items-center gap-2 mb-3">
-          <span className="price">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+          <span className="price">Rs. {effPrice(product)?.toLocaleString()}</span>
           {product.sale_price && product.sale_price < product.price && (
             <span className="price-old">Rs. {product.price?.toLocaleString()}</span>
           )}
@@ -110,6 +110,9 @@ export default function Products() {
 
 function ProductsInner() {
   const searchParams = useSearchParams()
+  // Single key rule (mirrored in cart/[id]/wishlist/drawer):
+  // sizeless items use 'Free Size' so keys never contain 'undefined'.
+  const normalizeKey = (id: string, size?: string) => `${id}-${size || 'Free Size'}`
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('All')
@@ -130,12 +133,14 @@ function ProductsInner() {
     const s = searchParams.get('sale')
     const so = searchParams.get('sort')
     const q = searchParams.get('search')
+    const sz = searchParams.get('size')
     if (c) setCategory(c)
     if (s === 'true') setSaleOnly(true)
     if (so) setSort(so)
     if (q) setSearch(q)
+    if (sz) setSizeFilter(sz)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
   useEffect(() => {
     fetchProducts()
@@ -173,23 +178,30 @@ function ProductsInner() {
     }
   }
 
+  const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
+
   const addToCart = (product: any, size: string) => {
     if (product.sizes?.length > 0 && !size) {
       setToast('⚠️ Please select a size first!')
       setTimeout(() => setToast(''), 2500)
       return
     }
-    const key = `${product.id}-${size}`
-    const price = (product.sale_price && product.sale_price < product.price) ? product.sale_price : product.price
-    const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+    if (product.stock != null && product.stock < 1) {
+      setToast('⚠️ Out of stock!')
+      setTimeout(() => setToast(''), 2500)
+      return
+    }
+    const key = normalizeKey(product.id, size)
+    const price = effPrice(product)
+    const existing = cart.find((i: any) => normalizeKey(i.id, i.selectedSize) === key)
     let newCart
     if (existing) {
       let newQty = existing.qty + 1
       if (product.stock != null) newQty = Math.min(newQty, product.stock)
       if (newQty <= existing.qty) { setToast('⚠️ Only ' + product.stock + ' in stock!'); setTimeout(() => setToast(''), 2500); return }
-      newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
+      newCart = cart.map((i: any) => normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: newQty, price } : i)
     } else {
-      newCart = [...cart, { ...product, price, qty: 1, selectedSize: size }]
+      newCart = [...cart, { ...product, price, qty: 1, selectedSize: size || 'Free Size' }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
@@ -209,16 +221,16 @@ function ProductsInner() {
   }
 
   const removeCartItem = (key: string) => {
-    const newCart = cart.filter((i: any) => `${i.id}-${i.selectedSize}` !== key)
+    const newCart = cart.filter((i: any) => normalizeKey(i.id, i.selectedSize) !== key)
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
   }
 
   const updateQty = (key: string, qty: number) => {
     const clamped = Math.max(1, qty)
-    const target = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+    const target = cart.find((i: any) => normalizeKey(i.id, i.selectedSize) === key)
     const finalQty = target?.stock != null ? Math.min(clamped, target.stock) : clamped
-    const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: finalQty } : i)
+    const newCart = cart.map((i: any) => normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: finalQty } : i)
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
   }
@@ -227,13 +239,18 @@ function ProductsInner() {
   let filtered = category === 'All' ? [...products] : products.filter((p: any) => p.category === category)
   if (saleOnly) filtered = filtered.filter((p: any) => p.sale_price && p.sale_price < p.price)
   if (search.trim()) {
+    const q = search.trim().toLowerCase()
     filtered = filtered.filter((p: any) =>
-      p.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.description?.toLowerCase().includes(search.toLowerCase())
+      p.name?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q) ||
+      p.category?.toLowerCase().includes(q)
     )
   }
-  if (sort === 'price-low') filtered.sort((a: any, b: any) => a.price - b.price)
-  else if (sort === 'price-high') filtered.sort((a: any, b: any) => b.price - a.price)
+  // 'popular' = sale items first (biggest discount), then newest. Review
+  // counts aren't fetched on this page, so discount rank is the proxy.
+  if (sort === 'popular') filtered.sort((a: any, b: any) => ((b.price - effPrice(b)) - (a.price - effPrice(a))))
+  else if (sort === 'price-low') filtered.sort((a: any, b: any) => effPrice(a) - effPrice(b))
+  else if (sort === 'price-high') filtered.sort((a: any, b: any) => effPrice(b) - effPrice(a))
   else if (sort === 'sale') filtered.sort((a: any, b: any) => ((b.price - (b.sale_price && b.sale_price < b.price ? b.sale_price : b.price)) - (a.price - (a.sale_price && a.sale_price < a.price ? a.sale_price : a.price))))
   // 'newest' keeps default order
   if (priceRange === 'under2000') filtered = filtered.filter((p: any) => (p.sale_price && p.sale_price < p.price ? p.sale_price : p.price) < 2000)
@@ -280,6 +297,7 @@ function ProductsInner() {
             <select value={sort} onChange={e => setSort(e.target.value)}
               className="border border-[#E8E3DB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#B5293A] bg-white flex-shrink-0 font-semibold text-[#6B6560] cursor-pointer">
               <option value="newest">Newest</option>
+              <option value="popular">Popular</option>
               <option value="sale">Sale</option>
               <option value="price-low">Price ↑</option>
               <option value="price-high">Price ↓</option>
@@ -300,7 +318,7 @@ function ProductsInner() {
               In-stock
             </label>
             <div className="flex gap-1.5 items-center">
-              {['S', 'M', 'L', 'XL'].map(s => (
+              {['S', 'M', 'L', 'XL', 'XXL'].map(s => (
                 <button key={s} onClick={() => setSizeFilter(f => f === s ? '' : s)}
                   className={`size-pill ${sizeFilter === s ? 'active' : ''}`}>{s}</button>
               ))}
@@ -355,9 +373,10 @@ function ProductsInner() {
         onUpdateQty={updateQty}
       />
 
-      <footer className="bg-red-700 text-white py-8 text-center mt-8 sm:mt-10 hidden sm:block">
+      <footer className="bg-red-700 text-white py-8 text-center mt-8 sm:mt-10">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>
         <p className="text-red-200 text-sm mt-1">Made with ❤️ in Nepal</p>
+        <a href="/" className="text-red-200 text-sm font-bold hover:text-white transition">← Home</a>
       </footer>
     </main>
   )

@@ -47,6 +47,8 @@ create policy "orders_owner_read" on orders
   for select to authenticated using (user_id = auth.uid());
 create policy "orders_owner_update" on orders
   for update to authenticated using (user_id = auth.uid());
+create policy "orders_owner_delete_pending" on orders
+  for delete to authenticated using (user_id = auth.uid() and payment_status = 'pending');
 
 -- 6. order_items: writable only alongside own order.
 create policy "items_owner_insert" on order_items
@@ -55,6 +57,9 @@ create policy "items_owner_insert" on order_items
 create policy "items_owner_read" on order_items
   for select to authenticated using (
     exists (select 1 from orders o where o.id = order_id and o.user_id = auth.uid()));
+create policy "items_owner_delete_pending" on order_items
+  for delete to authenticated using (
+    exists (select 1 from orders o where o.id = order_id and o.user_id = auth.uid() and o.payment_status = 'pending'));
 
 -- 7. reviews: public read, authenticated insert for own user_id, owner update/delete.
 create policy "reviews_public_read" on reviews

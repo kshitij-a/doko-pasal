@@ -14,12 +14,14 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getClient()
-    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
     const action = searchParams.get('action') || ''
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const rawPage = parseInt(searchParams.get('page') || '1')
+    const rawLimit = parseInt(searchParams.get('limit') || '20')
+    const page = Math.max(Number.isNaN(rawPage) ? 1 : rawPage, 1)
+    const limit = Math.min(Math.max(Number.isNaN(rawLimit) ? 20 : rawLimit, 1), 100)
     const offset = (page - 1) * limit
 
     let query = supabase.from('activity_logs').select('*', { count: 'exact' })
@@ -27,7 +29,10 @@ export async function GET(request: Request) {
       .range(offset, offset + limit - 1)
 
     if (search) {
-      query = query.or(`user_email.ilike.%${search}%,user_name.ilike.%${search}%`)
+      // Escape LIKE wildcards and PostgREST `or` separators so user input
+      // cannot alter the filter structure.
+      const esc = search.replace(/([%_(),])/g, '\\$1')
+      query = query.or(`user_email.ilike.%${esc}%,user_name.ilike.%${esc}%`)
     }
     if (action) {
       query = query.eq('action', action)
@@ -52,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'action is required' }, { status: 400 })
     }
     const supabase = getClient()
-    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     const { error } = await supabase.from('activity_logs').insert({
       user_id: body.user_id || null,
       user_email: body.user_email || null,

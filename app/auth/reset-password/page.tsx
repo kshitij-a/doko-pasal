@@ -15,35 +15,23 @@ export default function ResetPassword() {
 
   useEffect(() => {
     const handleTokens = async () => {
+      // A valid recovery session requires BOTH the recovery tokens in the
+      // URL hash AND a live session for that user — never any logged-in session.
       const hash = window.location.hash
-      const isRecovery = hash.includes('type=recovery')
-      if (hash) {
-        const params = new URLSearchParams(hash.substring(1))
-        const accessToken = params.get('access_token')
-        const refreshToken = params.get('refresh_token')
-        if (accessToken && refreshToken) {
-          if (!isRecovery) {
-            setError('Invalid link type. Please use the password recovery link from your email.')
-            return
-          }
-          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-          if (error) {
-            setError('Invalid or expired link. Please request a new one.')
-          } else {
-            setReady(true)
-          }
-          window.history.replaceState(null, '', window.location.pathname)
-          return
-        }
-      }
-      const { data: { session } } = await supabase.auth.getSession()
-      // Only treat an existing session as a valid recovery session when the
-      // landing URL carries the recovery type marker.
-      if (session && isRecovery) {
-        setReady(true)
-      } else {
+      const params = new URLSearchParams(hash.substring(1))
+      const accessToken = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+      if (!accessToken || !refreshToken || params.get('type') !== 'recovery') {
         setError('No valid session. Please use the link from your email.')
+        return
       }
+      const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      if (error || !data.session?.user) {
+        setError('Invalid or expired link. Please request a new one.')
+      } else {
+        setReady(true)
+      }
+      window.history.replaceState(null, '', window.location.pathname)
     }
     handleTokens()
   }, [])

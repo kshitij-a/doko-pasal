@@ -2,16 +2,16 @@ import { supabase } from './supabase'
 
 export async function logActivity(action: string, details?: Record<string, any>, page?: string) {
   try {
-    const { data: userData } = await supabase.auth.getUser()
-    const user = userData?.user
-
+    // Identity is derived server-side from the Bearer token; only
+    // action/page/details are sent from the client.
+    const { data: { session } } = await supabase.auth.getSession()
     await fetch('/api/activity', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({
-        user_id: user?.id || null,
-        user_email: user?.email || null,
-        user_name: user?.user_metadata?.full_name || null,
         action,
         details: details || null,
         page: page || (typeof window !== 'undefined' ? window.location.pathname : null),

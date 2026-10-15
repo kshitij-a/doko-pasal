@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { adminFetch } from '../lib/admin-fetch'
 
 const sections = [
   {
@@ -43,18 +44,24 @@ export default function AdminSidebar() {
 
   useEffect(() => {
     const fetchCounts = async () => {
-      const [products, pendingOrders, users, unreadConvs] = await Promise.all([
-        supabase.from('products').select('*', { count: 'exact', head: true }),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('order_status', 'pending'),
-        supabase.auth.admin.listUsers(),
-        supabase.from('conversations').select('*', { count: 'exact', head: true }).gt('unread_count', 0),
-      ])
-      setCounts({
-        products: products.count || 0,
-        'pending-orders': pendingOrders.count || 0,
-        users: users.data?.users?.length || 0,
-        unread: unreadConvs.count || 0,
-      })
+      // No count endpoints: badge reads stay direct (proxy + RLS gate them).
+      // auth.admin.listUsers needs the service role and is unavailable from
+      // the browser, so the user count comes from /api/admin/users instead.
+      try {
+        const [products, pendingOrders, usersRes, unreadConvs] = await Promise.all([
+          supabase.from('products').select('*', { count: 'exact', head: true }),
+          supabase.from('orders').select('*', { count: 'exact', head: true }).eq('order_status', 'pending'),
+          adminFetch('/api/admin/users'),
+          supabase.from('conversations').select('*', { count: 'exact', head: true }).gt('unread_count', 0),
+        ])
+        const usersJson = await usersRes.json().catch(() => ({ users: [] }))
+        setCounts({
+          products: products.count || 0,
+          'pending-orders': pendingOrders.count || 0,
+          users: usersJson.users?.length || 0,
+          unread: unreadConvs.count || 0,
+        })
+      } catch { /* badges are best-effort */ }
     }
     fetchCounts()
   }, [])

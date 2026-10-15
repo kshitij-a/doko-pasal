@@ -15,6 +15,9 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
         <button onClick={reset} className="bg-[#B5293A] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#9A2231] transition">
           Try Again
         </button>
+        <div className="mt-4">
+          <a href="/" className="text-sm font-bold text-[#B5293A] hover:underline">← Back to Home</a>
+        </div>
       </div>
     </main>
   )

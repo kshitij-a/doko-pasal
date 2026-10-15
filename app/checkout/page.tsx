@@ -57,6 +57,15 @@ export default function Checkout() {
   const itemCount = cart.reduce((sum, i) => sum + i.qty, 0)
   const payableTotal = Math.max(0, total - discount)
 
+  // Orphan cleanup: remove items first, then the order; log failures so silent
+  // RLS denials (no owner-delete policy yet) show up instead of piling orphans.
+  const cleanupOrder = async (orderId: string) => {
+    const { error: itemsErr } = await supabase.from('order_items').delete().eq('order_id', orderId)
+    if (itemsErr) console.error('Orphan cleanup: order_items delete failed:', itemsErr.message)
+    const { error: orderErr } = await supabase.from('orders').delete().eq('id', orderId)
+    if (orderErr) console.error('Orphan cleanup: order delete failed:', orderErr.message)
+  }
+
   const applyCoupon = async () => {
     const code = couponInput.trim()
     if (!code) return
@@ -128,23 +137,24 @@ export default function Checkout() {
     const { error: itemsError } = await supabase.from('order_items').insert(items)
     if (itemsError) {
       alert('Error saving order items: ' + itemsError.message)
-      await supabase.from('orders').delete().eq('id', order.id)
+      await cleanupOrder(order.id)
       placingRef.current = false
       setLoading(false)
       return
     }
 
     let chargeTotal = total
+    const bearer = (await supabase.auth.getSession()).data.session?.access_token ?? ''
     try {
       const validateRes = await fetch('/api/validate-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
         body: JSON.stringify({ orderId: order.id, userId: user.id, couponCode: couponCode || undefined, pointsToUse: couponCode === 'LOYALTY' ? loyaltyBalance : undefined, finalize: paymentMethod === 'cod' || paymentMethod === 'bank' }),
       })
       const validation = await validateRes.json()
       if (!validateRes.ok || validation.valid === false) {
         alert(validation.message || validation.error || 'Order validation failed. Please review your cart.')
-        await supabase.from('orders').delete().eq('id', order.id)
+        await cleanupOrder(order.id)
         placingRef.current = false
         setLoading(false)
         return
@@ -157,7 +167,7 @@ export default function Checkout() {
     } catch (e) {
       console.error('Order validation error:', e)
       alert('Could not validate order. Please try again.')
-      await supabase.from('orders').delete().eq('id', order.id)
+      await cleanupOrder(order.id)
       placingRef.current = false
       setLoading(false)
       return
@@ -167,7 +177,7 @@ export default function Checkout() {
       try {
       const response = await fetch('/api/payment/initiate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
         body: JSON.stringify({ method: 'khalti', amount: chargeTotal, orderId: order.id, productName: 'Doko Pasal Order', customerName: form.name, customerPhone: form.phone, customerEmail: user.email }),
       })
       const data = await response.json()
@@ -183,7 +193,7 @@ export default function Checkout() {
       try {
       const response = await fetch('/api/payment/initiate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
         body: JSON.stringify({ method: 'esewa', amount: chargeTotal, orderId: order.id, productName: 'Doko Pasal Order' }),
       })
       const data = await response.json()
@@ -222,7 +232,7 @@ export default function Checkout() {
         body: JSON.stringify({ customerName: form.name, customerEmail: user.email, customerPhone: form.phone, orderId: order.id, items, total: payableTotal, paymentMethod, address: `${form.address}, ${form.city}` }),
       })
     } catch (e) { console.log('Email error:', e) }
-    router.push('/orders?success=true')
+    router.push(paymentMethod === 'cod' || paymentMethod === 'bank' ? '/orders?success=true&payment=pending' : '/orders?success=true')
     logActivity('purchase', { total: chargeTotal, payment_method: paymentMethod, items: cart.length }, '/checkout')
     } catch (e) {
       console.error('Place order error:', e)

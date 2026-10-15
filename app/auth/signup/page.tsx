@@ -42,10 +42,10 @@ export default function SignUp() {
     }
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
       options: {
-        data: { full_name: name, phone: phone }
+        data: { full_name: name.trim(), phone: phone.trim() }
       }
     })
 

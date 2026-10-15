@@ -27,10 +27,12 @@ export default function TrackOrderPage() {
     setStatus('')
     setResult(null)
     try {
+      // Accept a pasted full UUID — the API only needs the first 8 chars.
+      const short = orderId.trim().replace(/-/g, '').slice(0, 8)
       const res = await fetch('/api/track-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, phone }),
+        body: JSON.stringify({ orderId: short, phone }),
       })
       const data = await res.json()
       if (!res.ok) setStatus(data.error || 'Order not found.')
@@ -53,10 +55,9 @@ export default function TrackOrderPage() {
           <input
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
-            placeholder="Order ID (first 8 characters)"
+            placeholder="Order ID (8 chars or paste full ID)"
             required
             minLength={8}
-            maxLength={8}
             className="w-full bg-[#FAF8F4] border border-[#E8E3DB] rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:border-[#C9963A]"
           />
           <input

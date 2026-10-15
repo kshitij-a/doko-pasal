@@ -24,6 +24,7 @@ export default function AdminReviews() {
   }
 
   const fetchReviews = async () => {
+    // No /api/admin/reviews endpoint: reads/delete stay direct, gated by proxy + RLS.
     const { data } = await supabase.from('reviews').select('*').order('created_at', { ascending: false })
     setReviews(data || [])
     const productIds = [...new Set((data || []).map(r => r.product_id).filter(Boolean))]

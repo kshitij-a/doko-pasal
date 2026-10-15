@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '../../../lib/supabase'
 
 function VerifyContent() {
   const searchParams = useSearchParams()
@@ -39,9 +40,13 @@ function VerifyContent() {
     }
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch('/api/payment/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ method, pidx, orderId, data }),
       })
 

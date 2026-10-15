@@ -13,8 +13,6 @@ const INFO_PAGES = [
   '/shipping',
 ]
 
-const CATEGORIES = ["Men's Wear", "Women's Wear", "Kids' Wear"]
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getBaseUrl()
   const now = new Date()
@@ -22,12 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const urls: MetadataRoute.Sitemap = [
     { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1 },
     { url: `${baseUrl}/products`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
-    ...CATEGORIES.map((c) => ({
-      url: `${baseUrl}/products?category=${encodeURIComponent(c)}`,
-      lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-    })),
+    // No query-string URLs (e.g. /products?category=...) — not canonical.
     ...INFO_PAGES.map((p) => ({
       url: `${baseUrl}${p}`,
       lastModified: now,

@@ -26,16 +26,24 @@ export async function proxy(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
+    // Fail closed: without a service client we cannot verify admin status.
     const service = createServiceClient()
-    if (!service) return response
-    const { data: admin } = await service.from('admins').select('email').eq('email', user.email).single()
+    if (!service) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
+    const email = user.email?.trim().toLowerCase()
+    if (!email) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
+    const { data: admin } = await service.from('admins').select('email').eq('email', email).single()
     if (!admin) {
       return NextResponse.redirect(new URL('/', request.url))
     }
     return response
   } catch (e) {
     console.error('proxy admin gate error:', e)
-    return NextResponse.next()
+    // Fail closed: any exception denies admin access.
+    return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 }
 

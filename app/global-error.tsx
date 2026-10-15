@@ -17,6 +17,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             <button onClick={reset} style={{ background: '#B5293A', color: 'white', padding: '0.75rem 2rem', borderRadius: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>
               Refresh Page
             </button>
+            <div style={{ marginTop: '1rem' }}>
+              <a href="/" style={{ color: '#B5293A', fontSize: '0.875rem', fontWeight: 700 }}>← Back to Home</a>
+            </div>
           </div>
         </main>
       </body>

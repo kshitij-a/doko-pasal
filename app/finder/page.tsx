@@ -5,14 +5,34 @@ import Navbar from '../../components/Navbar'
 
 const NEEDS = ['Festive', 'Wedding', 'Winter', 'Daily', 'Gift']
 const CATEGORIES = ["Men's Wear", "Women's Wear", "Kids' Wear"]
-const SIZES = ['S', 'M', 'L', 'XL', 'Free Size']
+const SIZES = ['S', 'M', 'L', 'XL', 'XXL', 'Free Size']
+
+// Each need maps to category/search terms that actually exist in the catalog.
+const NEED_MAP: Record<string, { category?: string; search?: string; sale?: boolean }> = {
+  Festive: { category: "Women's Wear", sale: true },
+  Wedding: { category: "Men's Wear" },
+  Winter: { search: 'sweater' },
+  Daily: {},
+  Gift: { sale: true },
+}
 
 export default function Finder() {
   const [need, setNeed] = useState('')
   const [category, setCategory] = useState('')
   const [size, setSize] = useState('')
   const step = !need ? 1 : !category ? 2 : 3
-  const href = `/products?category=${encodeURIComponent(category)}&search=${encodeURIComponent(need)}`
+  const buildHref = () => {
+    const mapped = NEED_MAP[need] || {}
+    const params = new URLSearchParams()
+    const cat = category || mapped.category
+    if (cat) params.set('category', cat)
+    if (mapped.search) params.set('search', mapped.search)
+    else if (!mapped.category && !mapped.sale && need) params.set('search', need)
+    if (mapped.sale) params.set('sale', 'true')
+    if (size) params.set('size', size)
+    return `/products?${params.toString()}`
+  }
+  const href = buildHref()
 
   const pill = (active: boolean) =>
     `filter-pill whitespace-nowrap ${active ? 'active' : ''}`

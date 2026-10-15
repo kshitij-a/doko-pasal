@@ -27,17 +27,26 @@ export async function POST(request: Request) {
     const { orderId } = await request.json()
     if (!orderId) return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })
 
-    const { data: order } = await supabase.from('orders').select('user_id').eq('id', orderId).single()
+    const { data: order } = await supabase.from('orders').select('user_id, order_status').eq('id', orderId).single()
     if (!order || order.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden - order does not belong to caller' }, { status: 403 })
     }
 
+    // Per-order idempotency: only settle while the order is still pending. The
+    // prepaid verify path only settles on its pending->paid transition (409
+    // otherwise) and COD/bank finalize calls this once, so a non-pending order
+    // here means stock was already settled.
+    // shortcut: no stock_settled column — repeat calls while still pending would
+    // double-decrement; callers must call once per order (add orders.stock_settled
+    // boolean when the schema allows).
+    if (order.order_status !== 'pending') {
+      return NextResponse.json({ success: true, alreadySettled: true })
+    }
+
     const { data: items } = await supabase.from('order_items').select('product_id, quantity').eq('order_id', orderId)
     for (const it of items || []) {
-      const { data: p } = await supabase.from('products').select('stock').eq('id', it.product_id).single()
-      if (p && p.stock != null) {
-        await supabase.from('products').update({ stock: Math.max(0, p.stock - it.quantity) }).eq('id', it.product_id)
-      }
+      const { data: ok, error: stockError } = await supabase.rpc('decrement_stock', { p_product: it.product_id, p_qty: it.quantity })
+      if (stockError || ok === false) console.error('decrement_stock failed:', it.product_id, stockError || 'insufficient stock')
     }
     return NextResponse.json({ success: true })
   } catch (e: any) {

@@ -109,7 +109,7 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
     <header className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#1E1A16]/95 backdrop-blur-md shadow-lg' : 'bg-[#1E1A16]'}`}>
       {/* Announcement Bar */}
       <div className="bg-[#C9963A] text-[#1E1A16] text-center py-1.5 px-4">
-        <p className="text-xs sm:text-sm font-semibold">Delivery charge confirmed before delivery · Easy returns within 7 days</p>
+        <p className="text-xs sm:text-sm font-semibold">Delivery charge confirmed with you before delivery · Easy returns within 7 days</p>
       </div>
 
       {/* Main Nav */}
@@ -148,7 +148,7 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                       className="flex items-center gap-3 px-4 py-3 hover:bg-[#FAF8F4] transition border-b border-gray-100 last:border-0">
                       <div className="w-12 h-12 rounded-lg bg-[#F5F2EE] overflow-hidden flex-shrink-0">
                         {p.image_url || p.image_urls?.[0]
-                          ? <img src={p.image_url || p.image_urls[0]} alt={p.name} className="w-full h-full object-cover" />
+                          ? <img src={p.image_url || p.image_urls[0]} alt={p.name} width={48} height={48} loading="lazy" className="w-full h-full object-cover" />
                           : <div className="w-full h-full flex items-center justify-center text-lg">🧺</div>}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -305,7 +305,7 @@ export default function Navbar({ onCartOpen, cartCount = 0, wishlistCount = 0 }:
                   className="flex items-center gap-3 px-4 py-3 hover:bg-[#FAF8F4] transition border-b border-gray-100 last:border-0">
                   <div className="w-10 h-10 rounded-lg bg-[#F5F2EE] overflow-hidden flex-shrink-0">
                     {p.image_url || p.image_urls?.[0]
-                      ? <img src={p.image_url || p.image_urls[0]} alt={p.name} className="w-full h-full object-cover" />
+                      ? <img src={p.image_url || p.image_urls[0]} alt={p.name} width={40} height={40} loading="lazy" className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center text-sm">🧺</div>}
                   </div>
                   <div className="flex-1 min-w-0">

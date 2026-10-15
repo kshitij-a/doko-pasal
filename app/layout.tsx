@@ -68,11 +68,13 @@ export default function RootLayout({
       "query-input": "required name=search_term_string",
     },
   };
+  // Escape '<' so JSON-LD can never break out of the script tag.
+  const safeJsonLd = (o: object) => JSON.stringify(o).replace(/</g, '\u003c');
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen flex flex-col">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(orgJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(siteJsonLd) }} />
         <Analytics />
         {children}
         <MobileBottomBar />

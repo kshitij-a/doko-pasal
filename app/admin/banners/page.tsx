@@ -69,7 +69,7 @@ export default function AdminBanners() {
 
   const deleteBanner = async (banner: any) => {
     if (!confirm('Delete this banner?')) return
-    await fetch(`/api/admin/banners?id=${banner.id}`, { method: 'DELETE' })
+    await adminFetch(`/api/admin/banners?id=${banner.id}`, { method: 'DELETE' })
     showToast('Banner deleted'); fetchBanners()
   }
 

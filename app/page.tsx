@@ -12,6 +12,7 @@ export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterMsg, setNewsletterMsg] = useState('')
+  const [newsletterOk, setNewsletterOk] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -47,12 +48,14 @@ export default function Home() {
         body: JSON.stringify({ email: newsletterEmail }),
       })
       const data = await res.json()
-      if (!res.ok) setNewsletterMsg(data.error || 'Subscription failed.')
+      if (!res.ok) { setNewsletterOk(false); setNewsletterMsg(data.error || 'Subscription failed.') }
       else {
+        setNewsletterOk(true)
         setNewsletterMsg('Subscribed! Welcome to Doko Pasal.')
         setNewsletterEmail('')
       }
     } catch {
+      setNewsletterOk(false)
       setNewsletterMsg('Could not subscribe. Try again.')
     }
   }
@@ -109,10 +112,10 @@ export default function Home() {
       {banners.length > 0 ? (
         <section className="relative overflow-hidden">
           <div className="flex transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
-            {banners.map((banner) => (
+            {banners.map((banner, i) => (
               <div key={banner.id} className="w-full flex-shrink-0">
                 <a href={safeBannerLink(banner.link_url)} className="block relative group">
-                  <img src={banner.image_url} alt={banner.title || 'Banner'} className="w-full h-[50vh] sm:h-[65vh] md:h-[80vh] object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <img src={banner.image_url} alt={banner.title || 'Banner'} width={1600} height={900} fetchPriority={i === 0 ? 'high' : 'auto'} decoding="async" className="w-full h-[50vh] sm:h-[65vh] md:h-[80vh] object-cover group-hover:scale-105 transition-transform duration-700" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#1E1A16]/80 via-[#1E1A16]/30 to-transparent" />
                   <div className="absolute bottom-8 sm:bottom-16 left-6 sm:left-16 text-white max-w-lg">
                     {banner.title && <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-3" style={{ fontFamily: 'var(--font-display)' }}>{banner.title}</h1>}
@@ -140,7 +143,7 @@ export default function Home() {
         /* Default Hero */
         <section className="relative overflow-hidden bg-[#1E1A16]">
           <div className="absolute inset-0 opacity-20">
-            <img src="https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1600&h=900&fit=crop" alt="" className="w-full h-full object-cover" />
+            <img src="https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1600&h=900&fit=crop" alt="" width={1600} height={900} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
           </div>
           <div className="relative max-w-7xl mx-auto px-6 sm:px-8 py-20 sm:py-28 md:py-36 text-center text-white">
             <p className="text-[#C9963A] text-sm font-bold tracking-widest uppercase mb-4 animate-fade-in">Welcome to</p>
@@ -175,7 +178,7 @@ export default function Home() {
             {categories.map((cat) => (
               <Link href={`/products?category=${cat.name}`} key={cat.name} className="category-card group">
                 <div className="aspect-[3/4] overflow-hidden bg-[#F5F2EE]">
-                  <img src={cat.img} alt={cat.name} className="w-full h-full object-cover" loading="lazy" />
+                  <img src={cat.img} alt={cat.name} width={600} height={800} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </div>
                 <div className="category-overlay">
                   <p className="text-xs font-bold text-white/60 uppercase tracking-widest mb-1">{cat.name.split(' ')[0]}</p>
@@ -211,7 +214,7 @@ export default function Home() {
                   <Link href={`/products/${product.id}`} key={product.id} className="product-card group">
                     <div className="product-image-wrap">
                       {images.length > 0
-                        ? <img src={images[0]} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                        ? <img src={images[0]} alt={product.name} width={400} height={400} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-4xl bg-[#F5F2EE]">🧺</div>
                       }
                       {product.sale_price && product.sale_price < product.price && (
@@ -222,7 +225,7 @@ export default function Home() {
                       <p className="product-category">{product.category || 'Clothing'}</p>
                       <p className="product-name truncate">{product.name}</p>
                       <div className="flex items-center gap-2">
-                        <span className="price text-base">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+                        <span className="price text-base">Rs. {(product.sale_price && product.sale_price < product.price ? product.sale_price : product.price)?.toLocaleString()}</span>
                         {product.sale_price && product.sale_price < product.price && (
                           <span className="price-old text-sm">Rs. {product.price?.toLocaleString()}</span>
                         )}
@@ -259,7 +262,7 @@ export default function Home() {
                   <Link href={`/products/${product.id}`} key={product.id} className="product-card group">
                     <div className="product-image-wrap">
                       {images.length > 0
-                        ? <img src={images[0]} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                        ? <img src={images[0]} alt={product.name} width={400} height={400} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-4xl bg-[#F5F2EE]">🧺</div>
                       }
                       {product.sale_price && product.sale_price < product.price && (
@@ -270,7 +273,7 @@ export default function Home() {
                       <p className="product-category">{product.category || 'Clothing'}</p>
                       <p className="product-name truncate">{product.name}</p>
                       <div className="flex items-center gap-2">
-                        <span className="price text-base">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+                        <span className="price text-base">Rs. {(product.sale_price && product.sale_price < product.price ? product.sale_price : product.price)?.toLocaleString()}</span>
                         {product.sale_price && product.sale_price < product.price && (
                           <span className="price-old text-sm">Rs. {product.price?.toLocaleString()}</span>
                         )}
@@ -308,7 +311,7 @@ export default function Home() {
                   <Link href={`/products/${product.id}`} key={product.id} className="product-card group">
                     <div className="product-image-wrap">
                       {images.length > 0
-                        ? <img src={images[0]} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                        ? <img src={images[0]} alt={product.name} width={400} height={400} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-4xl bg-[#F5F2EE]">🧺</div>
                       }
                       <span className="absolute top-3 left-3 badge-sale">
@@ -319,7 +322,7 @@ export default function Home() {
                       <p className="product-category">{product.category || 'Clothing'}</p>
                       <p className="product-name truncate">{product.name}</p>
                       <div className="flex items-center gap-2">
-                        <span className="price text-base">Rs. {(product.sale_price || product.price)?.toLocaleString()}</span>
+                        <span className="price text-base">Rs. {(product.sale_price && product.sale_price < product.price ? product.sale_price : product.price)?.toLocaleString()}</span>
                         <span className="price-old text-sm">Rs. {product.price?.toLocaleString()}</span>
                       </div>
                     </div>
@@ -446,7 +449,7 @@ export default function Home() {
                   <input type="email" required value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} placeholder="Your email" className="flex-1 min-w-0 bg-white/10 border border-white/15 rounded-l-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#C9963A]/50" />
                   <button type="submit" className="bg-[#C9963A] text-[#1E1A16] px-4 py-2 rounded-r-lg font-bold text-sm hover:bg-[#B5293A] hover:text-white transition">→</button>
                 </form>
-                {newsletterMsg && <p className="text-xs text-white/60 mt-2" role="status">{newsletterMsg}</p>}
+                {newsletterMsg && <p className={`text-xs mt-2 ${newsletterOk ? 'text-emerald-300' : 'text-red-300'}`} role="status">{newsletterMsg}</p>}
               </div>
             </div>
           </div>

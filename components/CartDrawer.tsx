@@ -7,8 +7,13 @@ interface CartDrawerProps {
   cart: any[]
   cartTotal: number
   onRemove: (key: string) => void
+  // Contract: qty is ABSOLUTE (the new quantity to set), not a delta.
   onUpdateQty: (key: string, qty: number) => void
 }
+
+// Single key rule (mirrored in cart/products/[id]/wishlist pages):
+// sizeless items use 'Free Size' so keys never contain 'undefined'.
+const normalizeKey = (id: string, size?: string) => `${id}-${size || 'Free Size'}`
 
 export default function CartDrawer({ open, onClose, cart, cartTotal, onRemove, onUpdateQty }: CartDrawerProps) {
   if (!open) return null
@@ -46,12 +51,12 @@ export default function CartDrawer({ open, onClose, cart, cartTotal, onRemove, o
             </div>
           ) : (
             cart.map((item: any) => {
-              const key = `${item.id}-${item.selectedSize}`
+              const key = normalizeKey(item.id, item.selectedSize)
               return (
                 <div key={key} className="flex gap-3 items-center bg-white rounded-xl p-3 border border-[#E8E3DB]">
                   <div className="w-16 h-16 rounded-lg overflow-hidden bg-[#F5F2EE] flex-shrink-0">
                     {item.image_url || item.image_urls?.[0]
-                      ? <img src={item.image_url || item.image_urls[0]} alt={item.name} className="w-full h-full object-cover" />
+                      ? <img src={item.image_url || item.image_urls[0]} alt={item.name} width={64} height={64} loading="lazy" className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center text-xl">🧺</div>}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -88,7 +93,7 @@ export default function CartDrawer({ open, onClose, cart, cartTotal, onRemove, o
               <span className="text-sm text-[#6B6560]">Subtotal ({itemCount} items)</span>
               <span className="text-lg font-bold text-[#1E1A16]">Rs. {cartTotal.toLocaleString()}</span>
             </div>
-            <p className="text-xs text-[#2A7D4F] font-semibold mb-4">Delivery charge confirmed before delivery</p>
+            <p className="text-xs text-[#2A7D4F] font-semibold mb-4">Delivery charge confirmed with you before delivery</p>
             <div className="flex gap-3">
               <Link href="/cart" onClick={onClose}
                 className="flex-1 btn-ghost-dark text-center py-3 text-sm">

@@ -20,6 +20,7 @@ export default function ChatWidget() {
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [loadError, setLoadError] = useState('')
   const messagesEndRef = useRef<any>(null)
   const fileInputRef = useRef<any>(null)
 
@@ -62,41 +63,59 @@ export default function ChatWidget() {
   }
 
   const getOrCreateConversation = async (user: any) => {
-    // Check existing conversation
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    if (existing) {
-      setConversationId(existing.id)
-      loadMessages(existing.id)
-    } else {
-      // Create new conversation
-      const { data: newConv } = await supabase
+    try {
+      // Check existing conversation
+      const { data: existing, error: fetchError } = await supabase
         .from('conversations')
-        .insert({
-          user_id: user.id,
-          user_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-          user_email: user.email,
-          last_message: '',
-        })
-        .select()
+        .select('*')
+        .eq('user_id', user.id)
         .single()
-      if (newConv) {
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        setLoadError('Could not load chat. Please reopen or try again later.')
+        return
+      }
+      if (existing) {
+        setConversationId(existing.id)
+        loadMessages(existing.id)
+      } else {
+        // Create new conversation
+        const { data: newConv, error: createError } = await supabase
+          .from('conversations')
+          .insert({
+            user_id: user.id,
+            user_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+            user_email: user.email,
+            last_message: '',
+          })
+          .select()
+          .single()
+        if (createError || !newConv) {
+          setLoadError('Could not start chat. Please try again later.')
+          return
+        }
         setConversationId(newConv.id)
       }
+    } catch {
+      setLoadError('Could not load chat. Please check your connection and try again.')
     }
   }
 
   const loadMessages = async (convId: string) => {
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: true })
-    if (data) setMessages(data)
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: true })
+      if (error) {
+        setLoadError('Could not load messages. Pull to retry by reopening the chat.')
+        return
+      }
+      if (data) setMessages(data)
+    } catch {
+      setLoadError('Could not load messages. Pull to retry by reopening the chat.')
+    }
   }
 
   const sendMessage = async (content: string, mediaUrl?: string, mediaType?: string) => {
@@ -165,6 +184,7 @@ export default function ChatWidget() {
   const handleOpen = () => {
     setOpen(true)
     setUnread(0)
+    setLoadError('')
     if (conversationId) loadMessages(conversationId)
   }
 
@@ -199,7 +219,12 @@ export default function ChatWidget() {
 
           {/* MESSAGES */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-gray-50">
-            {messages.length === 0 && (
+            {loadError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl px-3 py-2" role="alert">
+                ⚠️ {loadError}
+              </div>
+            )}
+            {messages.length === 0 && !loadError && (
               <div className="text-center py-8">
                 <div className="text-4xl mb-3">👋</div>
                 <p className="font-bold text-gray-700 text-sm">नमस्ते! Welcome to Doko Pasal</p>

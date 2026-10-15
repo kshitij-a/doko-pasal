@@ -12,6 +12,10 @@ export default function Cart() {
   const [upsell, setUpsell] = useState<any[]>([])
   const router = useRouter()
 
+  // Single key rule (mirrored in products/[id]/wishlist/drawer):
+  // sizeless items use 'Free Size' so keys never contain 'undefined'.
+  const normalizeKey = (id: string, size?: string) => `${id}-${size || 'Free Size'}`
+
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 2500)
@@ -43,15 +47,19 @@ export default function Cart() {
       showToast('Please choose a size')
       return
     }
+    if (product.stock != null && product.stock < 1) {
+      showToast('⚠️ Out of stock!')
+      return
+    }
     const selectedSize = chosenSize ?? product.sizes?.[0] ?? 'Free Size'
     const effectivePrice = product.sale_price && product.sale_price < product.price ? product.sale_price : product.price
-    const key = `${product.id}-${selectedSize}`
-    const existing = cart.find(i => `${i.id}-${i.selectedSize}` === key)
+    const key = normalizeKey(product.id, selectedSize)
+    const existing = cart.find(i => normalizeKey(i.id, i.selectedSize) === key)
     let updated
     if (existing) {
       let newQty = existing.qty + 1
       if (product.stock != null) newQty = Math.min(newQty, product.stock)
-      updated = cart.map(i => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty } : i)
+      updated = cart.map(i => normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: newQty } : i)
     } else {
       updated = [...cart, { ...product, price: effectivePrice, qty: 1, selectedSize }]
     }
@@ -66,7 +74,7 @@ export default function Cart() {
       const ids: string[] = raw ? JSON.parse(raw) : []
       if (!ids.includes(id)) localStorage.setItem('wishlist', JSON.stringify([...ids, id]))
     } catch (e) { console.error('Failed to save for later:', e) }
-    const updated = cart.filter(i => `${i.id}-${i.selectedSize}` !== key)
+    const updated = cart.filter(i => normalizeKey(i.id, i.selectedSize) !== key)
     setCart(updated)
     localStorage.setItem('cart', JSON.stringify(updated))
     showToast('❤️ Saved for later')
@@ -77,10 +85,12 @@ export default function Cart() {
     setUser(data.user)
   }
 
-  const updateQty = (key: any, delta: any) => {
+  // delta mode (default): second arg is +/-1 from the cart page buttons.
+  // absolute mode: second arg is the new qty (matches CartDrawer contract).
+  const updateQty = (key: any, value: any, mode: 'delta' | 'absolute' = 'delta') => {
     const updated = cart.map(i => {
-      if (`${i.id}-${i.selectedSize}` !== key) return i
-      const clamped = Math.max(1, i.qty + delta)
+      if (normalizeKey(i.id, i.selectedSize) !== key) return i
+      const clamped = Math.max(1, mode === 'absolute' ? value : i.qty + value)
       const finalQty = i.stock != null ? Math.min(clamped, i.stock) : clamped
       return { ...i, qty: finalQty }
     })
@@ -89,7 +99,7 @@ export default function Cart() {
   }
 
   const removeItem = (key: any) => {
-    const updated = cart.filter(i => `${i.id}-${i.selectedSize}` !== key)
+    const updated = cart.filter(i => normalizeKey(i.id, i.selectedSize) !== key)
     setCart(updated)
     localStorage.setItem('cart', JSON.stringify(updated))
   }
@@ -142,7 +152,7 @@ export default function Cart() {
           const { widthPct } = deliveryProgress(total)
           return (
           <div className="bg-white rounded-2xl shadow p-4 mb-6">
-            <p className="text-sm font-bold text-green-700 mb-2">📞 Delivery charge is confirmed with you before delivery</p>
+            <p className="text-sm font-bold text-green-700 mb-2">📞 Delivery charge confirmed with you before delivery — no prepayment needed</p>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full bg-green-500 rounded-full" style={{ width: `${widthPct}%` }} />
             </div>
@@ -165,13 +175,13 @@ export default function Cart() {
             {/* CART ITEMS */}
             <div className="md:col-span-2 space-y-4">
               {cart.map(item => {
-                const key = `${item.id}-${item.selectedSize}`
+                const key = normalizeKey(item.id, item.selectedSize)
                 return (
                   <div key={key} className="bg-white rounded-2xl shadow p-5 flex items-center gap-4">
                     {/* Image */}
                     <div className="w-20 h-20 rounded-xl overflow-hidden bg-red-50 flex items-center justify-center text-3xl flex-shrink-0">
                       {item.image_url || (item.image_urls && item.image_urls[0])
-                        ? <img src={item.image_url || item.image_urls[0]} alt={item.name} className="w-full h-full object-cover" />
+                        ? <img src={item.image_url || item.image_urls[0]} alt={item.name} width={80} height={80} loading="lazy" className="w-full h-full object-cover" />
                         : item.category === "Men's Wear" ? '👔' : item.category === "Women's Wear" ? '👗' : '🧒'}
                     </div>
 
@@ -250,7 +260,7 @@ export default function Cart() {
 
                 <div className="mt-5 pt-4 border-t space-y-2">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>✅</span><span>Delivery charge confirmed before delivery</span>
+                    <span>✅</span><span>Delivery charge confirmed with you before delivery — no prepayment needed</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>💳</span><span>eSewa, Khalti, COD accepted</span>
@@ -274,7 +284,7 @@ export default function Cart() {
                   <Link href={`/products/${p.id}`}>
                     <div className="h-28 bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center">
                       {p.image_url || p.image_urls?.[0]
-                        ? <img src={p.image_url || p.image_urls[0]} alt={p.name} className="w-full h-full object-cover" />
+                        ? <img src={p.image_url || p.image_urls[0]} alt={p.name} width={300} height={112} loading="lazy" className="w-full h-full object-cover" />
                         : <span className="text-3xl opacity-30">🧺</span>}
                     </div>
                     <p className="font-bold text-sm text-gray-800 truncate mt-2">{p.name}</p>
@@ -290,6 +300,11 @@ export default function Cart() {
           </div>
         )}
       </div>
+      <footer className="bg-red-700 text-white py-8 text-center mt-8 sm:mt-10">
+        <p className="text-xl font-extrabold">🧺 Doko Pasal</p>
+        <p className="text-red-200 text-sm mt-1">Made with ❤️ in Nepal</p>
+        <a href="/" className="text-red-200 text-sm font-bold hover:text-white transition">← Home</a>
+      </footer>
     </main>
   )
 }

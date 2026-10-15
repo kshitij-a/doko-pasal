@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 // IMPORTANT: admin check must run server-side (Route Handlers / server code only).
 // Never call this from client components — the Bearer token + admins lookup
 // below is server-side verification, not client-side gating.
-// NOTE: the admins lookup uses the anon key on purpose; RLS must allow
-// SELECT on `admins` for authenticated users only (no public/anon read).
+// NOTE: the admins lookup uses the service-role client to bypass RLS; the
+// anon client is only used to validate the Bearer token via auth.getUser.
 export async function verifyAdminAccess(request: Request): Promise<{ authorized: boolean; response?: NextResponse }> {
   try {
     const authHeader = request.headers.get('authorization')
@@ -25,10 +25,20 @@ export async function verifyAdminAccess(request: Request): Promise<{ authorized:
       return { authorized: false, response: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) }
     }
 
-    const { data: adminData } = await supabase
+    const email = user.email?.trim().toLowerCase()
+    if (!email) {
+      return { authorized: false, response: NextResponse.json({ error: 'Forbidden - not an admin' }, { status: 403 }) }
+    }
+
+    const admin = getSupabaseAdmin()
+    if (!admin) {
+      return { authorized: false, response: NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 }) }
+    }
+
+    const { data: adminData } = await admin
       .from('admins')
       .select('email')
-      .eq('email', user.email)
+      .eq('email', email)
       .single()
 
     if (!adminData) {
@@ -37,7 +47,7 @@ export async function verifyAdminAccess(request: Request): Promise<{ authorized:
 
     return { authorized: true }
   } catch (error: any) {
-    return { authorized: false, response: NextResponse.json({ error: 'Auth verification failed: ' + (error.message || 'Unknown error') }, { status: 500 }) }
+    return { authorized: false, response: NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 }) }
   }
 }
 

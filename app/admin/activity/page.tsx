@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { adminFetch } from '../../../lib/admin-fetch'
 import { npDateTime } from '../../../lib/timezone'
 
 const ACTION_TYPES = [
@@ -46,7 +47,7 @@ export default function AdminActivity() {
     setLoading(true)
     const params = new URLSearchParams({ search, action: actionFilter, page: String(page), limit: '50' })
     try {
-      const res = await fetch(`/api/admin/activity?${params}`)
+      const res = await adminFetch(`/api/admin/activity?${params}`)
       const data = await res.json()
       setLogs(data.logs || [])
       setTotal(data.total || 0)

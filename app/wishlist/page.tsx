@@ -64,6 +64,9 @@ export default function Wishlist() {
   }
 
   const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
+  // Single key rule (mirrored in cart/products/[id]/drawer):
+  // sizeless items use 'Free Size' so keys never contain 'undefined'.
+  const normalizeKey = (id: string, size?: string) => `${id}-${size || 'Free Size'}`
 
   const addToCart = (product: any, size?: string) => {
     const selectedSize = size || selectedSizes[product.id] || ''
@@ -72,15 +75,15 @@ export default function Wishlist() {
       return
     }
     const finalSize = selectedSize || 'Free Size'
-    const key = `${product.id}-${finalSize}`
+    const key = normalizeKey(product.id, finalSize)
     const price = effPrice(product)
-    const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+    const existing = cart.find((i: any) => normalizeKey(i.id, i.selectedSize) === key)
     let newCart
     if (existing) {
       let newQty = existing.qty + 1
       if (product.stock != null) newQty = Math.min(newQty, product.stock)
       if (newQty <= existing.qty) { showToast(`⚠️ Only ${product.stock} in stock!`); return }
-      newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
+      newCart = cart.map((i: any) => normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: newQty, price } : i)
     } else {
       if (product.stock != null && product.stock < 1) { showToast('⚠️ Out of stock!'); return }
       newCart = [...cart, { ...product, price, qty: 1, selectedSize: finalSize }]
@@ -93,22 +96,27 @@ export default function Wishlist() {
   const addAllToCart = () => {
     const available = products.filter(p => p.stock == null || p.stock > 0)
     let newCart = [...cart]
+    let defaultUsed = false
     available.forEach(product => {
-      const selectedSize = product.sizes?.[0] || 'Free Size'
-      const key = `${product.id}-${selectedSize}`
+      const picked = selectedSizes[product.id]
+      if (product.sizes?.length > 0 && !picked) defaultUsed = true
+      const selectedSize = picked || product.sizes?.[0] || 'Free Size'
+      const key = normalizeKey(product.id, selectedSize)
       const price = effPrice(product)
-      const existing = newCart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+      const existing = newCart.find((i: any) => normalizeKey(i.id, i.selectedSize) === key)
       if (existing) {
         let newQty = existing.qty + 1
         if (product.stock != null) newQty = Math.min(newQty, product.stock)
-        newCart = newCart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i)
+        newCart = newCart.map((i: any) => normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: newQty, price } : i)
       } else {
         newCart = [...newCart, { ...product, price, qty: 1, selectedSize }]
       }
     })
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
-    showToast(`✅ All ${available.length} items added to cart!`)
+    showToast(defaultUsed
+      ? `✅ All ${available.length} added! Default size used — change in cart if needed.`
+      : `✅ All ${available.length} items added to cart!`)
   }
 
   const clearWishlist = () => {
@@ -203,7 +211,7 @@ export default function Wishlist() {
                   <Link href={`/products/${product.id}`}>
                     <div className="relative h-56 bg-gray-50 overflow-hidden cursor-pointer">
                       {images.length > 0 ? (
-                        <img src={images[0]} alt={product.name}
+                        <img src={images[0]} alt={product.name} width={400} height={224} loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">
@@ -297,6 +305,7 @@ export default function Wishlist() {
       <footer className="bg-red-700 text-white py-10 text-center mt-10">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>
         <p className="text-red-200 text-sm mt-1">Made with ❤️ in Nepal</p>
+        <Link href="/" className="text-red-200 text-sm font-bold hover:text-white transition">← Home</Link>
       </footer>
     </main>
   )

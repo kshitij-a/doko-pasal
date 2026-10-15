@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminAccess, getSupabaseAdmin } from '../../../../lib/admin-api'
+import { check, getIp } from '../../../../lib/rate-limit'
 
 function getAdminClient() {
   const client = getSupabaseAdmin()
@@ -20,39 +21,15 @@ export async function GET(request: Request) {
     let users: any[] = []
     const supabaseAdmin = getAdminClient()
     if (!supabaseAdmin) {
-      return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+      return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     }
 
-    if (supabaseAdmin) {
-      const { data: authData, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-      if (!error && authData?.users) {
-        users = authData.users
-      }
+    // Fail loud: no activity_logs-derived fallback users, and no 200-with-error.
+    const { data: authData, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    if (error || !authData?.users) {
+      return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
     }
-
-    if (users.length === 0) {
-      const { data: activityUsers } = await supabaseAdmin
-        .from('activity_logs')
-        .select('user_id, user_email, user_name')
-        .not('user_id', 'is', null)
-
-      const userMap = new Map<string, any>()
-      activityUsers?.forEach((a: any) => {
-        if (a.user_id && !userMap.has(a.user_id)) {
-          userMap.set(a.user_id, {
-            id: a.user_id,
-            email: a.user_email,
-            full_name: a.user_name || '',
-            phone: '',
-            avatar_url: '',
-            banned: false,
-            created_at: '',
-            last_sign_in: null,
-          })
-        }
-      })
-      users = Array.from(userMap.values())
-    }
+    users = authData.users
 
     let filtered = users
     if (search) {
@@ -108,7 +85,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ users: enriched })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message, users: [] }, { status: 200 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
@@ -122,14 +99,20 @@ export async function PATCH(request: Request) {
 
     if (userId === '__order__' && data?.orderId) {
       const client = getAdminClient()
-      if (!client) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
-      const { error } = await client.from('orders').update({ order_status: data.order_status }).eq('id', data.orderId)
+      if (!client) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
+      const updates: Record<string, string> = {}
+      if (typeof data.order_status === 'string') updates.order_status = data.order_status
+      if (typeof data.payment_status === 'string') updates.payment_status = data.payment_status
+      if (Object.keys(updates).length === 0) {
+        return NextResponse.json({ error: 'order_status or payment_status required' }, { status: 400 })
+      }
+      const { error } = await client.from('orders').update(updates).eq('id', data.orderId)
       if (error) throw error
       return NextResponse.json({ success: true })
     }
 
     const client = getAdminClient()
-    if (!client) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!client) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
 
     const { error } = await client.auth.admin.updateUserById(userId, {
       user_metadata: data,
@@ -160,10 +143,14 @@ export async function POST(request: Request) {
   const { authorized, response } = await verifyAdminAccess(request)
   if (!authorized) return response!
 
+  if (!check(getIp(request), 30, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const client = getAdminClient()
   if (!client) {
     return NextResponse.json({
-      error: 'Admin actions require SUPABASE_SERVICE_ROLE_KEY. Please add it to your Vercel environment variables.'
+      error: 'Service temporarily unavailable'
     }, { status: 500 })
   }
 
@@ -239,13 +226,17 @@ export async function DELETE(request: Request) {
   const { authorized, response } = await verifyAdminAccess(request)
   if (!authorized) return response!
 
+  if (!check(getIp(request), 30, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')
 
     if (action === 'delete-order') {
       const client = getAdminClient()
-      if (!client) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+      if (!client) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
       const orderId = searchParams.get('orderId')
       if (!orderId) return NextResponse.json({ error: 'Order ID required' }, { status: 400 })
       await client.from('order_items').delete().eq('order_id', orderId)
@@ -260,7 +251,7 @@ export async function DELETE(request: Request) {
     const client = getAdminClient()
     if (!client) {
       return NextResponse.json({
-        error: 'User deletion requires SUPABASE_SERVICE_ROLE_KEY. Please add it to your Vercel environment variables.'
+        error: 'Service temporarily unavailable'
       }, { status: 500 })
     }
 

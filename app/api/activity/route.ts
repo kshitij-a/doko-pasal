@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServiceClient } from '../../../lib/supabase-server'
 import { check, getIp } from '../../../lib/rate-limit'
 
@@ -18,11 +19,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'details must be an object' }, { status: 400 })
     }
     const supabase = createServiceClient()
-    if (!supabase) return NextResponse.json({ error: 'Server configuration error - service role key not set' }, { status: 500 })
+    if (!supabase) return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 500 })
+    // Identity comes from the optional Bearer token, never the client body.
+    let userId: string | null = null
+    let userEmail: string | null = null
+    let userName: string | null = null
+    const auth = request.headers.get('authorization')
+    if (auth?.startsWith('Bearer ')) {
+      const anon = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { data: { user } } = await anon.auth.getUser(auth.replace('Bearer ', ''))
+      if (user) {
+        userId = user.id
+        userEmail = user.email?.trim().toLowerCase() || null
+        userName = (user.user_metadata?.full_name as string) || null
+      }
+    }
     const { error } = await supabase.from('activity_logs').insert({
-      user_id: body.user_id || null,
-      user_email: body.user_email || null,
-      user_name: body.user_name || null,
+      user_id: userId,
+      user_email: userEmail,
+      user_name: userName,
       action: body.action,
       details: body.details || null,
       page: body.page || null,

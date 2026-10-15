@@ -23,7 +23,7 @@ export default function Login() {
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     })
 

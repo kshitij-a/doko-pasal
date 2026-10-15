@@ -57,6 +57,14 @@ export default function Orders() {
     } catch { alert('Return request failed') }
   }
 
+  // Cancel a still-pending order (owner delete via RLS; needs orders owner-delete policy).
+  const cancelOrder = async (orderId: string) => {
+    if (!confirm('Cancel this pending order?')) return
+    const { error } = await supabase.from('orders').delete().eq('id', orderId)
+    if (error) { alert('Could not cancel order: ' + error.message); return }
+    setOrders(os => os.filter(o => o.id !== orderId))
+  }
+
   const statusBadge = (status: string) => {
     const map: Record<string, string> = { pending: 'badge-pending', processing: 'badge-processing', shipped: 'badge-shipped', delivered: 'badge-delivered', cancelled: 'badge-cancelled' }
     return map[status] || 'badge-pending'
@@ -69,6 +77,13 @@ export default function Orders() {
 
   const statusSteps = ['pending', 'processing', 'shipped', 'delivered']
 
+  // COD/bank orders land here with ?success=true&payment=pending, but branch on the
+  // actual latest order method/status too so plain ?success=true never shows "confirmed" for COD.
+  const searchPayment = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('payment') : null
+  const latest = orders[0]
+  const pendingBanner = searchPayment === 'pending'
+    || (latest && (latest.payment_method === 'cod' || latest.payment_method === 'bank') && latest.payment_status === 'pending')
+
   return (
     <main className="min-h-screen bg-[#FAF8F4] pb-28 sm:pb-0">
       <Navbar />
@@ -79,7 +94,7 @@ export default function Orders() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#D1FAE5] flex items-center justify-center">
               <svg className="w-8 h-8 text-[#2A7D4F]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
-            {new URLSearchParams(window.location.search).get('payment') === 'pending' ? (
+            {pendingBanner ? (
               <>
                 <h2 className="text-2xl font-bold text-[#1E1A16] mb-2" style={{ fontFamily: 'var(--font-display)' }}>Order Received — Payment Pending</h2>
                 <p className="text-[#6B6560] mb-6">Your order is placed. Please complete your eSewa/Khalti payment or keep cash ready for COD.</p>
@@ -176,6 +191,14 @@ export default function Orders() {
                     <p className="text-xs text-[#9E9994]">Delivering to: <span className="font-semibold text-[#6B6560]">{order.customer_address}</span></p>
                     <p className="text-lg font-bold text-[#B5293A]">Rs. {order.total_amount?.toLocaleString()}</p>
                   </div>
+                  {order.order_status === 'pending' && order.payment_status === 'pending' && (
+                    <div className="pt-3 flex gap-2">
+                      {(order.payment_method === 'khalti' || order.payment_method === 'esewa') && (
+                        <Link href="/checkout" className="btn-ghost-dark px-4 py-2 text-xs">Pay again</Link>
+                      )}
+                      <button onClick={() => cancelOrder(order.id)} className="btn-ghost-dark px-4 py-2 text-xs">Cancel order</button>
+                    </div>
+                  )}
                   {order.order_status === 'delivered' && (
                     <div className="pt-3">
                       {returns[order.id]

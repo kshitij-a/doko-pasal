@@ -32,8 +32,9 @@ export default function ProductDetail() {
   const [recentlyViewed, setRecentlyViewed] = useState<any[]>([])
 
   useEffect(() => {
-    // Get product ID from the URL
-    const id = window.location.pathname.split('/').pop()
+    // Last non-empty pathname segment, decoded, query/trailing-slash safe.
+    const segs = window.location.pathname.split('/').filter(Boolean)
+    const id = segs.length ? decodeURIComponent(segs[segs.length - 1]) : ''
     if (id) {
       loadProduct(id)
       logActivity('product_view', { product_id: id }, `/products/${id}`)
@@ -115,6 +116,11 @@ export default function ProductDetail() {
   }
 
   const effPrice = (p: any) => (p?.sale_price && p.sale_price < p.price ? p.sale_price : p?.price)
+  // Single key rule (mirrored in cart/products/wishlist/drawer):
+  // sizeless items use 'Free Size' so keys never contain 'undefined'.
+  const normalizeKey = (id: string, size?: string) => `${id}-${size || 'Free Size'}`
+  // Escape '<' so JSON-LD can never break out of the script tag.
+  const safeJsonLd = (o: any) => JSON.stringify(o).replace(/</g, '\\u003c')
 
   const addToCart = (silent = false) => {
     if (product.sizes?.length > 0 && !selectedSize) {
@@ -122,22 +128,29 @@ export default function ProductDetail() {
       document.getElementById('size-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-    const key = `${product.id}-${selectedSize}`
-    const existing = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+    if (product.stock != null && product.stock < 1) {
+      showToast('⚠️ Out of stock!')
+      return
+    }
+    const size = selectedSize || 'Free Size'
+    const key = normalizeKey(product.id, size)
+    const existing = cart.find((i: any) => normalizeKey(i.id, i.selectedSize) === key)
     const price = effPrice(product)
     let newCart
     if (existing) {
       let newQty = existing.qty + quantity
       if (product.stock != null) newQty = Math.min(newQty, product.stock)
       if (newQty < existing.qty + quantity) showToast(`⚠️ Only ${product.stock} in stock!`)
+      if (newQty < 1) { showToast('⚠️ Out of stock!'); return }
       newCart = cart.map((i: any) =>
-        `${i.id}-${i.selectedSize}` === key ? { ...i, qty: newQty, price } : i
+        normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: newQty, price } : i
       )
     } else {
       let qty = quantity
       if (product.stock != null) qty = Math.min(qty, product.stock)
       if (qty < quantity) showToast(`⚠️ Only ${product.stock} in stock!`)
-      newCart = [...cart, { ...product, price, qty, selectedSize }]
+      if (qty < 1) { showToast('⚠️ Out of stock!'); return }
+      newCart = [...cart, { ...product, price, qty, selectedSize: size }]
     }
     setCart(newCart)
     localStorage.setItem('cart', JSON.stringify(newCart))
@@ -216,7 +229,8 @@ export default function ProductDetail() {
       url: `${baseUrl}/products/${product.id}`,
       priceCurrency: CURRENCY,
       price: effPrice(product),
-      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      // Null stock = unlimited (matches the stock RPC), so treat as InStock.
+      availability: (product.stock == null || product.stock > 0) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     },
     ...(reviews.length > 0 ? {
       aggregateRating: {
@@ -262,10 +276,10 @@ export default function ProductDetail() {
     <main className="min-h-screen bg-white pb-16 sm:pb-0">
       {/* TOAST */}
       {productJsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(productJsonLd) }} />
       )}
       {breadcrumbJsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd) }} />
       )}
       {toast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl font-semibold text-sm">
@@ -433,7 +447,7 @@ export default function ProductDetail() {
 
             <div className="bg-gray-50 rounded-2xl p-5 space-y-3">
               {[
-                { icon: '🚚', title: 'Delivery on Contact', desc: 'Charge confirmed with you before delivery · 2-5 days across Nepal' },
+                { icon: '🚚', title: 'Delivery on Contact', desc: 'Delivery charge confirmed with you before delivery · 2-5 days across Nepal' },
                 { icon: '↩️', title: 'Easy Returns', desc: '7-day return policy' },
                 { icon: '✅', title: '100% Genuine', desc: 'Quality guaranteed' },
                 { icon: '💳', title: 'Secure Payment', desc: 'eSewa, Khalti, COD accepted' },
@@ -577,7 +591,7 @@ export default function ProductDetail() {
           {activeTab === 'delivery' && (
             <div className="max-w-2xl space-y-4">
               {[
-                { icon: '🚚', title: 'Standard Delivery', desc: 'Delivered in 2-5 business days across Nepal. Charge confirmed with you before delivery.' },
+                { icon: '🚚', title: 'Standard Delivery', desc: 'Delivered in 2-5 business days across Nepal. Delivery charge confirmed with you before delivery.' },
                 { icon: '🏔️', title: 'Hilly Regions', desc: 'Delivery to hilly areas may take 5-10 days.' },
                 { icon: '↩️', title: 'Return Policy', desc: 'Return within 7 days if you receive damaged or wrong product.' },
                 { icon: '📦', title: 'Packaging', desc: 'All products are carefully packed.' },
@@ -683,23 +697,24 @@ export default function ProductDetail() {
         cart={cart}
         cartTotal={cartTotal}
         onRemove={(key: string) => {
-          const newCart = cart.filter((i: any) => `${i.id}-${i.selectedSize}` !== key)
+          const newCart = cart.filter((i: any) => normalizeKey(i.id, i.selectedSize) !== key)
           setCart(newCart)
           localStorage.setItem('cart', JSON.stringify(newCart))
         }}
         onUpdateQty={(key: string, qty: number) => {
           const clamped = Math.max(1, qty)
-          const target = cart.find((i: any) => `${i.id}-${i.selectedSize}` === key)
+          const target = cart.find((i: any) => normalizeKey(i.id, i.selectedSize) === key)
           const finalQty = target?.stock != null ? Math.min(clamped, target.stock) : clamped
-          const newCart = cart.map((i: any) => `${i.id}-${i.selectedSize}` === key ? { ...i, qty: finalQty } : i)
+          const newCart = cart.map((i: any) => normalizeKey(i.id, i.selectedSize) === key ? { ...i, qty: finalQty } : i)
           setCart(newCart)
           localStorage.setItem('cart', JSON.stringify(newCart))
         }}
       />
 
-      <footer className="bg-red-700 text-white py-10 text-center mt-16 hidden sm:block">
+      <footer className="bg-red-700 text-white py-10 text-center mt-16">
         <p className="text-xl font-extrabold">🧺 Doko Pasal</p>
         <p className="text-red-200 text-sm mt-1">Made with ❤️ in Nepal</p>
+        <Link href="/" className="text-red-200 text-sm font-bold hover:text-white transition">← Home</Link>
       </footer>
     </main>
   )
