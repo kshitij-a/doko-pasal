@@ -1,9 +1,10 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-  'https://rkumkpobxhilvagewvmy.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrdW1rcG9ieGhpbHZhZ2V3dm15Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDE0NTYwMiwiZXhwIjoyMDk1NzIxNjAyfQ.hBrhsqBRMBn47RAmlriF_cr8Ojpm1KWtpJ8vWx3rUIo'
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !serviceKey) throw new Error('Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars first');
+
+const supabase = createClient(supabaseUrl, serviceKey);
 
 function img(id) {
   return `https://images.unsplash.com/photo-${id}?w=600&h=750&fit=crop`;
