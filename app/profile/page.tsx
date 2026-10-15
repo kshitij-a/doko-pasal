@@ -31,9 +31,10 @@ export default function ProfilePage() {
       setEmail(data.user.email || '')
       setPhone(data.user.user_metadata?.phone || '')
       setAvatarUrl(data.user.user_metadata?.avatar_url || '')
-      supabase.from('loyalty_points').select('points').eq('user_id', data.user.id).single().then(({ data: row }) => {
+      try {
+        const { data: row } = await supabase.from('loyalty_points').select('points').eq('user_id', data.user.id).single()
         setPoints(row ? Math.max(0, Math.floor(Number(row.points) || 0)) : 0)
-      }).catch(() => setPoints(0))
+      } catch { setPoints(0) }
     }
     loadUser()
   }, [router])

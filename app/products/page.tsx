@@ -8,6 +8,12 @@ import Navbar from '../../components/Navbar'
 import CartDrawer from '../../components/CartDrawer'
 import { logActivity } from '../../lib/activity'
 
+function effPrice(product: { price: number; sale_price?: number | null }) {
+  return product.sale_price && product.sale_price < product.price
+    ? product.sale_price
+    : product.price
+}
+
 function ProductCard({ product, onAddToCart, onToggleWishlist, inWishlist, onQuickAdd }: {
   product: any, onAddToCart: any, onToggleWishlist: any, inWishlist: boolean, onQuickAdd: (p: any, size: string) => void
 }) {
